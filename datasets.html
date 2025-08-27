@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dataset Finder & Scraper</title>
+  <style>
+    :root{ --bg:#0b1020; --panel:#12182b; --text:#e7ecff; --muted:#9fb0ffcc; --chip:#1b2340; --card:#0f1527; }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Helvetica Neue,Arial,Noto Sans,sans-serif;background:linear-gradient(180deg,var(--bg),#070a14 40%);color:var(--text)}
+    header{position:sticky;top:0;z-index:5;background:linear-gradient(180deg,rgba(7,10,20,.95),rgba(7,10,20,.75));backdrop-filter:blur(6px);border-bottom:1px solid #1f2746}
+    .container{max-width:1100px;margin:0 auto;padding:18px}
+    h1{font-size:1.35rem;margin:0 0 10px}
+    .controls{display:grid;gap:10px;grid-template-columns:1fr}
+    @media(min-width:900px){.controls{grid-template-columns:2.3fr 1fr}}
+    .panel{background:var(--panel);border:1px solid #20294a;border-radius:14px;padding:12px}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    input,select,button{padding:10px 12px;border-radius:10px;border:1px solid #223160;background:#0a0f21;color:var(--text)}
+    button{cursor:pointer}
+    button.primary{background:linear-gradient(180deg,#2a3c7d,#24356d);border-color:#2d3f80}
+    .chips{display:flex;gap:8px;flex-wrap:wrap}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:8px 10px;border-radius:999px;background:var(--chip);border:1px solid #23315f;font-size:.92rem}
+    .hint{color:var(--muted);font-size:.9rem}
+    .grid{display:grid;grid-template-columns:1fr;gap:14px;margin-top:14px}
+    @media(min-width:700px){.grid{grid-template-columns:1fr 1fr}}
+    @media(min-width:1024px){.grid{grid-template-columns:1fr 1fr 1fr}}
+    .card{background:var(--card);border:1px solid #1c2546;border-radius:16px;overflow:hidden;display:flex;flex-direction:column}
+    .content{padding:12px}
+    .meta{display:flex;justify-content:space-between;align-items:center;gap:8px;color:var(--muted);font-size:.85rem;margin-bottom:6px}
+    .title a{color:var(--text);text-decoration:none;font-weight:600}
+    .title a:hover{text-decoration:underline}
+    .desc{color:#cdd6ff;font-size:.95rem}
+    .tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+    .tag{padding:4px 8px;border:1px solid #2a376b;border-radius:999px;font-size:.8rem;color:#bdd1ff}
+    .empty{text-align:center;padding:40px 10px;color:var(--muted)}
+    .hidden{display:none!important}
+    #sources-panel{max-height:68vh;overflow:auto;-webkit-overflow-scrolling:touch}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:center">
+        <h1>Dataset Finder & Lightweight Scraper</h1>
+        <button id="toggle-controls" class="primary" style="white-space:nowrap">▲ Hide controls</button>
+      </div>
+      <div id="controls" class="controls">
+        <div class="panel">
+          <div class="row" style="justify-content:space-between;align-items:start">
+            <div style="flex:1 1 420px">
+              <div class="hint">Search multiple open-data catalogs at once. Then (optionally) scrape a specific page for downloadable files.</div>
+              <div class="row" style="gap:8px;align-items:stretch;margin-top:8px">
+                <input id="q" type="text" placeholder="e.g., pedestrian crashes Miami, hurricane tracks, LLM benchmarks" style="flex:1" />
+                <select id="format">
+                  <option value="">Any format</option>
+                  <option value="csv">CSV</option>
+                  <option value="json">JSON</option>
+                  <option value="geojson">GeoJSON</option>
+                  <option value="xlsx">XLSX/XLS</option>
+                  <option value="zip">ZIP</option>
+                  <option value="parquet">Parquet</option>
+                </select>
+                <button id="search" class="primary">Search datasets</button>
+              </div>
+              <div class="chips" style="margin-top:8px" id="source-chips"></div>
+              <div class="row" style="gap:8px;margin-top:6px">
+                <button id="select-all" class="chip">Select all</button>
+                <button id="deselect-all" class="chip">Deselect all</button>
+              </div>
+            </div>
+            <div class="panel" id="sources-panel" style="flex:1 1 260px">
+              <div class="hint" style="margin-bottom:6px">Optional: paste a page URL to scan for direct dataset files (CSV, JSON, GeoJSON, XLSX, ZIP, Parquet).</div>
+              <div class="row" style="gap:8px">
+                <input id="scrape-url" type="url" placeholder="https://example.com/datasets" style="flex:1" />
+                <button id="scrape" title="Scan page for downloadable file links">Scrape</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="row" style="justify-content:space-between;align-items:center">
+            <div class="hint">Sort & view</div>
+            <div class="row" style="gap:8px">
+              <select id="sort">
+                <option value="relevance">Relevance</option>
+                <option value="new">Newest first</option>
+                <option value="old">Oldest first</option>
+                <option value="az">Title A→Z</option>
+              </select>
+              <div class="hint"><span id="count">0</span> results</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <div id="results" class="grid"></div>
+    <div id="empty" class="empty hidden">No results yet. Try a broader query or select more sources.</div>
+  </main>
+
+  <script>
+    // Public catalogs/APIs (CORS-friendly)
+    const CATALOGS = {
+      'Data.gov (US)': { id:'datagov', enabled:true },
+      'Socrata Catalog (many city/state portals)': { id:'socrata', enabled:true },
+      'Zenodo (research repos)': { id:'zenodo', enabled:true },
+    };
+
+    // Build source chips
+    const chipsEl = document.getElementById('source-chips');
+    Object.entries(CATALOGS).forEach(([name, obj]) => {
+      const lab = document.createElement('label');
+      lab.className = 'chip';
+      lab.innerHTML = `<input type="checkbox" ${obj.enabled?'checked':''}/> <span>${name}</span>`;
+      const cb = lab.querySelector('input');
+      cb.addEventListener('change', ()=> obj.enabled = cb.checked);
+      chipsEl.appendChild(lab);
+    });
+
+    document.getElementById('select-all').onclick = ()=>{
+      Object.values(CATALOGS).forEach(o=>o.enabled=true);
+      chipsEl.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=true);
+    };
+    document.getElementById('deselect-all').onclick = ()=>{
+      Object.values(CATALOGS).forEach(o=>o.enabled=false);
+      chipsEl.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.checked=false);
+    };
+
+    const state = { items: [], lastQ: '', lastFormat: '' };
+    const el = (s)=>document.querySelector(s);
+
+    function tag(str){ const t=document.createElement('span'); t.className='tag'; t.textContent=str; return t; }
+    function showEmpty(show){ el('#empty').classList.toggle('hidden', !show); }
+    function setCount(n){ el('#count').textContent = n; }
+
+    function normalizeDate(d){ const t = Date.parse(d); return isNaN(t)?0:t; }
+
+    function applyFiltersSort(items){
+      const sort = el('#sort').value;
+      const fmt = el('#format').value.trim().toLowerCase();
+      let out = items;
+      if (fmt){ out = out.filter(r => (r.formats||[]).some(f=>f.toLowerCase().includes(fmt))); }
+      if (sort==='new') out.sort((a,b)=> normalizeDate(b.date)-normalizeDate(a.date));
+      if (sort==='old') out.sort((a,b)=> normalizeDate(a.date)-normalizeDate(b.date));
+      if (sort==='az') out.sort((a,b)=> a.title.localeCompare(b.title));
+      return out;
+    }
+
+    function render(items){
+      const results = el('#results');
+      results.innerHTML = '';
+      setCount(items.length);
+      if (!items.length){ showEmpty(true); return; } else { showEmpty(false); }
+      const frag = document.createDocumentFragment();
+      items.forEach(it => {
+        const card = document.createElement('article'); card.className = 'card';
+        const c = document.createElement('div'); c.className='content';
+        const meta = document.createElement('div'); meta.className = 'meta';
+        meta.innerHTML = `<span>${it.source||''}</span><span>${it.date? new Date(it.date).toLocaleDateString():''}</span>`;
+        const title = document.createElement('div'); title.className='title';
+        title.innerHTML = `<a href="${it.link}" target="_blank" rel="noopener">${it.title||'Untitled dataset'}</a>`;
+        const desc = document.createElement('div'); desc.className='desc';
+        desc.textContent = (it.description||'').replace(/<[^>]+>/g,'').slice(0,260) + ((it.description||'').length>260?'…':'');
+        const tags = document.createElement('div'); tags.className='tags';
+        (it.formats||[]).slice(0,8).forEach(f=> tags.appendChild(tag(f)) );
+        if (it.files && it.files.length){
+          const filesRow = document.createElement('div'); filesRow.className='tags';
+          it.files.slice(0,6).forEach(f=>{
+            const a=document.createElement('a'); a.href=f.url; a.target='_blank'; a.rel='noopener'; a.className='tag'; a.textContent=f.label; filesRow.appendChild(a);
+          });
+          c.appendChild(filesRow);
+        }
+        c.appendChild(meta); c.appendChild(title); c.appendChild(desc); c.appendChild(tags);
+        card.appendChild(c); frag.appendChild(card);
+      });
+      results.appendChild(frag);
+    }
+
+    // ---- Catalog searchers -----------------------------------------------
+    async function fetchJSON(url){
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    }
+
+    async function searchDataGov(q){
+      const url = `https://catalog.data.gov/api/3/action/package_search?rows=50&q=${encodeURIComponent(q)}`;
+      const data = await fetchJSON(url);
+      const hits = data?.result?.results||[];
+      return hits.map(x=>({
+        title: x.title,
+        description: x.notes,
+        link: `https://catalog.data.gov/dataset/${x.name}`,
+        date: x.metadata_modified,
+        source: 'Data.gov',
+        formats: (x.resources||[]).map(r=>r.format).filter(Boolean),
+        files: (x.resources||[]).filter(r=>r.url).map(r=>({label:(r.name||r.format||'file'), url:r.url}))
+      }));
+    }
+
+    async function searchSocrata(q){
+      const url = `https://api.us.socrata.com/api/catalog/v1?q=${encodeURIComponent(q)}&only=datasets&limit=50`;
+      const data = await fetchJSON(url);
+      const hits = data?.results||[];
+      return hits.map(x=>{
+        const res = x.resource||{}; const md = x.metadata||{}; const perm = x.permalink || res.permalink || '';
+        const f = (res.classification && res.classification.domain_category) || 'Dataset';
+        const fmts = new Set();
+        (x.linked_resources||[]).forEach(lr=>{ if(lr.format) fmts.add(lr.format); });
+        if (res.download_formats) Object.keys(res.download_formats).forEach(k=> fmts.add(k.toUpperCase()));
+        return {
+          title: res.name || md.name,
+          description: res.description || md.description,
+          link: perm || `https://${res.domain||''}/d/${res.id||''}`,
+          date: md.updatedAt || md.createdAt,
+          source: `Socrata: ${res.domain||''}`,
+          formats: Array.from(fmts),
+        };
+      });
+    }
+
+    async function searchZenodo(q){
+      const url = `https://zenodo.org/api/records?q=${encodeURIComponent(q)}&type=dataset&size=50&all_versions=false&sort=mostrecent`;
+      const data = await fetchJSON(url);
+      const hits = data?.hits?.hits||[];
+      return hits.map(x=>{
+        const files = (x.files||[]).map(f=>({label:f.key||f.filename, url:f.links?.self||f.links?.download}));
+        const fmts = new Set(files.map(f=> (f.label.split('.').pop()||'').toUpperCase()));
+        return {
+          title: x.metadata?.title,
+          description: x.metadata?.description,
+          link: x.links?.html || x.links?.latest_html,
+          date: x.metadata?.publication_date,
+          source: 'Zenodo',
+          formats: Array.from(fmts),
+          files,
+        };
+      });
+    }
+
+    // --- Lightweight scraper ----------------------------------------------
+    async function scrapePage(url){
+      const prox = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+      const r = await fetch(prox);
+      if (!r.ok) throw new Error('Failed to load page');
+      const data = await r.json();
+      const html = data.contents || '';
+      // Find direct file links
+      const REG = /(href|src)=["']([^"']+\.(?:csv|tsv|json|geojson|xlsx|xls|zip|parquet))(?:[?#][^"']*)?["']/gi;
+      const out = new Map();
+      let m; while((m = REG.exec(html))){
+        try{
+          const abs = new URL(m[2], url).toString();
+          const label = abs.split('/').pop();
+          out.set(abs, {label, url: abs});
+        }catch{}
+      }
+      return [{
+        title: `Links found on ${new URL(url).hostname}`,
+        description: 'Direct file links detected on the page (best effort).',
+        link: url,
+        date: new Date().toISOString(),
+        source: 'Scraper',
+        formats: Array.from(new Set(Array.from(out.values()).map(o=> (o.label.split('.').pop()||'').toUpperCase()))),
+        files: Array.from(out.values())
+      }];
+    }
+
+    async function runSearch(){
+      const q = el('#q').value.trim();
+      const enabled = Object.values(CATALOGS).filter(c=>c.enabled).map(c=>c.id);
+      if (!q && !enabled.length){ alert('Enter a query or enable at least one source.'); return; }
+      el('#results').innerHTML = '<div class="empty">Searching…</div>';
+      state.items = [];
+      const tasks = [];
+      if (enabled.includes('datagov')) tasks.push(searchDataGov(q).catch(()=>[]));
+      if (enabled.includes('socrata')) tasks.push(searchSocrata(q).catch(()=>[]));
+      if (enabled.includes('zenodo')) tasks.push(searchZenodo(q).catch(()=>[]));
+      const parts = await Promise.all(tasks);
+      state.items = parts.flat();
+      render(applyFiltersSort(state.items));
+      window.scrollTo({top: document.querySelector('header').offsetHeight, behavior: 'smooth'});
+    }
+
+    // Events
+    document.getElementById('search').addEventListener('click', runSearch);
+    document.getElementById('q').addEventListener('keydown', e=>{ if(e.key==='Enter') runSearch(); });
+    document.getElementById('sort').addEventListener('change', ()=> render(applyFiltersSort(state.items)) );
+    document.getElementById('format').addEventListener('change', ()=> render(applyFiltersSort(state.items)) );
+    document.getElementById('toggle-controls').addEventListener('click', ()=>{
+      const c = document.getElementById('controls');
+      c.classList.toggle('hidden');
+      document.getElementById('toggle-controls').textContent = c.classList.contains('hidden') ? '▼ Show controls' : '▲ Hide controls';
+    });
+    document.getElementById('scrape').addEventListener('click', async ()=>{
+      const url = el('#scrape-url').value.trim();
+      if (!url) return alert('Paste a page URL to scrape');
+      el('#results').innerHTML = '<div class="empty">Scanning page…</div>';
+      try{
+        const items = await scrapePage(url);
+        state.items = items;
+        render(items);
+      }catch(err){
+        console.error(err);
+        el('#results').innerHTML = '<div class="empty">Could not read that page. Some sites block cross-origin access.</div>';
+      }
+    });
+
+    // Initial hint
+    showEmpty(true);
+  </script>
+</body>
+</html>
