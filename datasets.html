@@ -78,17 +78,26 @@
           </div>
         </div>
         <div class="panel">
-          <div class="row" style="justify-content:space-between;align-items:center">
-            <div class="hint">Sort & view</div>
-            <div class="row" style="gap:8px">
+          <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap">
+            <div class="row" style="gap:10px;align-items:center;flex-wrap:wrap">
+              <div class="hint">Sort & view</div>
               <select id="sort">
                 <option value="relevance">Relevance</option>
                 <option value="new">Newest first</option>
                 <option value="old">Oldest first</option>
                 <option value="az">Title A→Z</option>
               </select>
-              <div class="hint"><span id="count">0</span> results</div>
+              <label class="chip" title="Show only records with direct file links (CSV, JSON, etc.)">
+                <input type="checkbox" id="only-direct" /> direct downloads only
+              </label>
+              <label class="chip" title="Only include datasets updated/published after this date">
+                Updated after
+                <input type="date" id="updated-after" style="background:#0a0f21;color:var(--text);border:1px solid #223160;border-radius:8px;padding:6px 8px;margin-left:6px"/>
+              </label>
             </div>
+            <div class="hint"><span id="count">0</span> results</div>
+          </div>
+        </div>
           </div>
         </div>
       </div>
@@ -104,8 +113,13 @@
     // Public catalogs/APIs (CORS-friendly)
     const CATALOGS = {
       'Data.gov (US)': { id:'datagov', enabled:true },
+      'data.gov.uk (UK)': { id:'datagovuk', enabled:false },
+      'EU Open Data': { id:'euodp', enabled:false },
       'Socrata Catalog (many city/state portals)': { id:'socrata', enabled:true },
       'Zenodo (research repos)': { id:'zenodo', enabled:true },
+      'Harvard Dataverse': { id:'dataverse', enabled:false },
+      'Figshare': { id:'figshare', enabled:false },
+      'World Bank (beta)': { id:'worldbank', enabled:false }
     };
 
     // Build source chips
@@ -140,8 +154,15 @@
     function applyFiltersSort(items){
       const sort = el('#sort').value;
       const fmt = el('#format').value.trim().toLowerCase();
+      const onlyDirect = !!document.getElementById('only-direct')?.checked;
+      const updatedAfterStr = document.getElementById('updated-after')?.value || '';
+      const updatedAfterTs = updatedAfterStr ? Date.parse(updatedAfterStr) : 0;
+
       let out = items;
-      if (fmt){ out = out.filter(r => (r.formats||[]).some(f=>f.toLowerCase().includes(fmt))); }
+      if (fmt){ out = out.filter(r => (r.formats||[]).some(f=> (f||'').toLowerCase().includes(fmt))); }
+      if (onlyDirect){ out = out.filter(r => Array.isArray(r.files) && r.files.length > 0); }
+      if (updatedAfterTs){ out = out.filter(r => normalizeDate(r.date) >= updatedAfterTs); }
+
       if (sort==='new') out.sort((a,b)=> normalizeDate(b.date)-normalizeDate(a.date));
       if (sort==='old') out.sort((a,b)=> normalizeDate(a.date)-normalizeDate(b.date));
       if (sort==='az') out.sort((a,b)=> a.title.localeCompare(b.title));
@@ -196,8 +217,99 @@
         date: x.metadata_modified,
         source: 'Data.gov',
         formats: (x.resources||[]).map(r=>r.format).filter(Boolean),
-        files: (x.resources||[]).filter(r=>r.url).map(r=>({label:(r.name||r.format||'file'), url:r.url}))
+        files: (x.resources||[]).filter(r=>r.url).map(r=>({label:(r.name||r.format||'file'), url:r.url})),
+        license: x.license_title || x.license_url || ''
       }));
+    }
+
+    async function searchDataGovUK(q){
+      const url = `https://ckan.publishing.service.gov.uk/api/3/action/package_search?rows=50&q=${encodeURIComponent(q)}`;
+      const data = await fetchJSON(url);
+      const hits = data?.result?.results||[];
+      return hits.map(x=>({
+        title: x.title,
+        description: x.notes,
+        link: `https://ckan.publishing.service.gov.uk/dataset/${x.name}`,
+        date: x.metadata_modified,
+        source: 'data.gov.uk',
+        formats: (x.resources||[]).map(r=>r.format).filter(Boolean),
+        files: (x.resources||[]).filter(r=>r.url).map(r=>({label:(r.name||r.format||'file'), url:r.url})),
+        license: x.license_title || x.license_url || ''
+      }));
+    }
+
+    async function searchEUODP(q){
+      const url = `https://data.europa.eu/api/hub/search/search?query=${encodeURIComponent(q)}&pageSize=50`;
+      const data = await fetchJSON(url);
+      const hits = data?.results || [];
+      return hits.map(x=>{
+        const d = x.distributions||[];
+        const files = d.filter(z=>z.downloadURL).map(z=>({label:(z.title?.[0]?.value||z.format||'file'), url:z.downloadURL}));
+        const fmts = Array.from(new Set(d.map(z=> (z.format||'').toUpperCase())));
+        return {
+          title: x.title?.[0]?.value || x.title || 'Dataset',
+          description: x.description?.[0]?.value || x.description || '',
+          link: x.landingPage || x.landingPageURL || x.id || '',
+          date: x.issued || x.modified || '',
+          source: 'EU Open Data',
+          formats: fmts,
+          files,
+          license: (x.license?.title?.[0]?.value) || ''
+        };
+      });
+    }
+
+    async function searchDataverse(q){
+      const url = `https://dataverse.harvard.edu/api/search?q=${encodeURIComponent(q)}&type=dataset&per_page=50`;
+      const data = await fetchJSON(url);
+      const hits = data?.data?.items || [];
+      return hits.map(x=>({
+        title: x.name,
+        description: x.description,
+        link: x.url,
+        date: x.published_at || x.updated_at || '',
+        source: 'Harvard Dataverse',
+        formats: [],
+        files: []
+      }));
+    }
+
+    async function searchFigshare(q){
+      const url = `https://api.figshare.com/v2/articles/search?search_for=${encodeURIComponent(q)}&page_size=50&item_type=dataset`;
+      const data = await fetchJSON(url);
+      const hits = Array.isArray(data) ? data : [];
+      return hits.map(x=>{
+        const files = (x.files||[]).map(f=>({label:f.name||f.supplied_md5||'file', url:f.download_url||f.supplied_url||x.url_public}));
+        const fmts = Array.from(new Set(files.map(f=> (f.label.split('.').pop()||'').toUpperCase())));
+        return {
+          title: x.title,
+          description: x.description,
+          link: x.url_public || x.url,
+          date: x.published_date || x.modified_date || '',
+          source: 'Figshare',
+          formats: fmts,
+          files,
+        };
+      });
+    }
+
+    async function searchWorldBank(q){
+      // world bank data catalog list, then simple client-side filter
+      const url = `https://api.worldbank.org/v2/datacatalog?format=json`;
+      const data = await fetchJSON(url);
+      const items = data?.[1] || [];
+      const qlc = q.toLowerCase();
+      return items.filter(x=> !q || (x.Name?.toLowerCase().includes(qlc) || x.Description?.toLowerCase().includes(qlc)))
+        .slice(0,50)
+        .map(x=>({
+          title: x.Name,
+          description: x.Description,
+          link: x.URL || x.AccessURL || 'https://datacatalog.worldbank.org/',
+          date: x.Las tUpdateDate || '',
+          source: 'World Bank (catalog)',
+          formats: [],
+          files: []
+        }));
     }
 
     async function searchSocrata(q){
@@ -278,6 +390,11 @@
       if (enabled.includes('datagov')) tasks.push(searchDataGov(q).catch(()=>[]));
       if (enabled.includes('socrata')) tasks.push(searchSocrata(q).catch(()=>[]));
       if (enabled.includes('zenodo')) tasks.push(searchZenodo(q).catch(()=>[]));
+      if (enabled.includes('datagovuk')) tasks.push(searchDataGovUK(q).catch(()=>[]));
+      if (enabled.includes('euodp')) tasks.push(searchEUODP(q).catch(()=>[]));
+      if (enabled.includes('dataverse')) tasks.push(searchDataverse(q).catch(()=>[]));
+      if (enabled.includes('figshare')) tasks.push(searchFigshare(q).catch(()=>[]));
+      if (enabled.includes('worldbank')) tasks.push(searchWorldBank(q).catch(()=>[]));
       const parts = await Promise.all(tasks);
       state.items = parts.flat();
       render(applyFiltersSort(state.items));
@@ -288,6 +405,9 @@
     document.getElementById('search').addEventListener('click', runSearch);
     document.getElementById('q').addEventListener('keydown', e=>{ if(e.key==='Enter') runSearch(); });
     document.getElementById('sort').addEventListener('change', ()=> render(applyFiltersSort(state.items)) );
+    document.getElementById('format').addEventListener('change', ()=> render(applyFiltersSort(state.items)) );
+    const onlyDirectEl = document.getElementById('only-direct'); if (onlyDirectEl) onlyDirectEl.addEventListener('change', ()=> render(applyFiltersSort(state.items)) );
+    const updatedAfterEl = document.getElementById('updated-after'); if (updatedAfterEl) updatedAfterEl.addEventListener('change', ()=> render(applyFiltersSort(state.items)) );
     document.getElementById('format').addEventListener('change', ()=> render(applyFiltersSort(state.items)) );
     document.getElementById('toggle-controls').addEventListener('click', ()=>{
       const c = document.getElementById('controls');
