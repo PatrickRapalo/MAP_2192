@@ -56,39 +56,18 @@
     .desc { color: #cdd6ff; font-size:.95rem }
     .footer { display:flex; justify-content: space-between; align-items:center; gap:8px; margin-top:auto; padding: 12px; border-top:1px solid #1a2240; color: var(--muted); font-size:.85rem }
     .empty { text-align:center; padding: 40px 10px; color: var(--muted) }
+    .hidden{display:none !important}
+  .fab{position:fixed; right:14px; bottom:14px; z-index:20;}
   </style>
 </head>
 <body>
   <header>
     <div class="container">
-      <h1>Latest Tech & Science Headlines</h1>
-      <div class="controls">
-        <div class="panel">
-          <div class="row" style="justify-content:space-between; align-items: start">
-            <div>
-              <div class="hint">Choose categories (you can toggle sources inside each)</div>
-              <div class="chips" id="category-chips"></div>
-            </div>
-            <div class="search">
-              <input id="q" type="text" placeholder="Filter by keyword (e.g., 'quantum', 'LLM', 'NASA')"/>
-              <select id="sort">
-                <option value="new">Newest first</option>
-                <option value="old">Oldest first</option>
-                <option value="az">Title A→Z</option>
-              </select>
-              <button class="primary" id="refresh">Fetch</button>
-            </div>
-          </div>
-        </div>
-        <div class="panel" id="sources-panel">
-          <div class="row" style="justify-content: space-between; align-items:center">
-            <strong>Sources</strong>
-            <div class="stats"><span id="count">0</span> items</div>
-          </div>
-          <div class="hint" style="margin:6px 0 10px">Toggle which feeds to include. Add/remove URLs below in the code if you want to customize.</div>
-          <div id="sources"></div>
-        </div>
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:center">
+        <h1>Latest Tech & Science Headlines</h1>
+        <button id="toggle-controls" class="primary" style="white-space:nowrap">▲ Hide controls</button>
       </div>
+      <div id="controls-wrap" class="controls">$1</div>
     </div>
   </header>
 
@@ -96,8 +75,8 @@
     <div class="grid" id="grid"></div>
     <div class="empty" id="empty" style="display:none">No stories matched your filters. Try a different category, sources, or keyword.</div>
   </main>
-
-  <script>
+    <button class="primary fab" id="fab" title="Show/Hide filters">Filters</button>
+    <script>
     // --- Feed catalog -------------------------------------------------------
     // You can add/remove feeds here. Each category has a list of sources.
     // The app fetches RSS via the public AllOrigins proxy to avoid CORS issues.
@@ -109,7 +88,7 @@
           { name: 'Meta AI', url: 'https://ai.facebook.com/blog/rss/' },
           { name: 'ArXiv AI (cs.AI)', url: 'https://arxiv.org/rss/cs.AI' },
           { name: 'MIT News – AI', url: 'https://news.mit.edu/rss/topic/artificial-intelligence2' },
-          { name: 'VentureBeat AI', url: 'https://venturebeat.com/category/ai/feed/' },
+          { name: 'VentureBeat AI', url: 'https://venturebeat.com/category/ai/feed/' }
         ]
       },
       Science: {
@@ -118,7 +97,7 @@
           { name: 'Nature – News', url: 'https://www.nature.com/subjects/science/news.rss' },
           { name: 'ScienceDaily – Top Science', url: 'https://www.sciencedaily.com/rss/top/science.xml' },
           { name: 'NOAA News', url: 'https://www.noaa.gov/news-features/feed' },
-          { name: 'Phys.org – Top News', url: 'https://phys.org/rss-feed/' },
+          { name: 'Phys.org – Top News', url: 'https://phys.org/rss-feed/' }
         ]
       },
       Tech: {
@@ -127,16 +106,46 @@
           { name: 'The Verge – Tech', url: 'https://www.theverge.com/tech/rss/index.xml' },
           { name: 'Ars Technica', url: 'https://feeds.arstechnica.com/arstechnica/index/' },
           { name: 'Wired', url: 'https://www.wired.com/feed/rss' },
-          { name: 'IEEE Spectrum', url: 'https://spectrum.ieee.org/feed' },
+          { name: 'IEEE Spectrum', url: 'https://spectrum.ieee.org/feed' }
+        ]
+      },
+      Cybersecurity: {
+        feeds: [
+          { name: 'The Hacker News', url: 'https://thehackernews.com/feeds/posts/default' },
+          { name: 'Krebs on Security', url: 'https://krebsonsecurity.com/feed/' },
+          { name: 'BleepingComputer', url: 'https://www.bleepingcomputer.com/feed/' },
+          { name: 'Schneier on Security', url: 'https://www.schneier.com/feed/atom/' }
+        ]
+      },
+      Gadgets: {
+        feeds: [
+          { name: 'Engadget', url: 'https://www.engadget.com/rss.xml' },
+          { name: 'Gizmodo', url: 'https://gizmodo.com/rss' },
+          { name: 'The Verge – Gadgets', url: 'https://www.theverge.com/rss/gadgets/index.xml' }
+        ]
+      },
+      'Dev & Open Source': {
+        feeds: [
+          { name: 'Hacker News – Front Page', url: 'https://hnrss.org/frontpage' },
+          { name: 'GitHub Blog', url: 'https://github.blog/feed/' },
+          { name: 'Stack Overflow Blog', url: 'https://stackoverflow.blog/feed/' }
+        ]
+      },
+      Hardware: {
+        feeds: [
+          { name: 'AnandTech', url: 'https://www.anandtech.com/rss' },
+          { name: "Tom's Hardware", url: 'https://www.tomshardware.com/feeds/all' },
+          { name: 'IEEE Spectrum – Semiconductors', url: 'https://spectrum.ieee.org/semiconductors/rss' }
         ]
       }
     };
 
     // --- UI state -----------------------------------------------------------
     const state = {
-      categories: new Set(['AI','Science','Tech']),
-      enabledFeeds: new Set(), // filled on init
+      categories: new Set(['AI','Science','Tech','Cybersecurity','Gadgets','Dev & Open Source','Hardware']),
+      enabledFeeds: new Set(),
       items: [],
+      showControls: true,
     };
 
     // --- Helpers ------------------------------------------------------------
@@ -332,10 +341,23 @@
         const merged = results.flatMap(r => r.status==='fulfilled' ? r.value : []);
         state.items = merged;
         renderItems(applyFiltersSort(merged));
+        // Auto-hide controls and reset search after fetching
+        const qEl = el('#q'); if (qEl) qEl.value = '';
+        setControls(false);
+        const main = document.querySelector('main'); if (main) main.scrollIntoView({behavior:'smooth'});
       } catch (e){
         console.error(e);
         el('#grid').innerHTML = '<div class="empty">Failed to fetch one or more feeds. Try again.</div>';
       }
+    }
+
+    // --- Controls show/hide -------------------------------------------------
+    function setControls(show){
+      state.showControls = !!show;
+      const wrap = document.getElementById('controls-wrap');
+      if (wrap) wrap.classList.toggle('hidden', !state.showControls);
+      const btn = document.getElementById('toggle-controls');
+      if (btn) btn.textContent = state.showControls ? '▲ Hide controls' : '▼ Show controls';
     }
 
     // --- Init ---------------------------------------------------------------
@@ -346,9 +368,11 @@
       });
       renderCategoryChips();
       renderSources();
-      el('#refresh').addEventListener('click', fetchAll);
+      el('#refresh').addEventListener('click', ()=>{ setControls(false); fetchAll(); });
       el('#q').addEventListener('input', ()=> renderItems(applyFiltersSort(state.items)) );
       el('#sort').addEventListener('change', ()=> renderItems(applyFiltersSort(state.items)) );
+      el('#toggle-controls').addEventListener('click', ()=> setControls(!state.showControls));
+      const fabBtn = document.getElementById('fab'); if (fabBtn) fabBtn.addEventListener('click', ()=> setControls(!state.showControls));
       // First fetch
       fetchAll();
     })();
