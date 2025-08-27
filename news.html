@@ -29,9 +29,7 @@
     }
     .container { max-width: 1100px; margin: 0 auto; padding: 18px 18px; }
     h1 { font-size: 1.35rem; margin: 0 0 10px; letter-spacing:.2px }
-    .controls {
-      display: grid; gap: 10px; grid-template-columns: 1fr; align-items: start;
-    }
+    .controls { display: grid; gap: 10px; grid-template-columns: 1fr; align-items: start; }
     @media (min-width: 800px){ .controls{ grid-template-columns: 2.2fr 1fr; } }
     .panel { background: var(--panel); border: 1px solid #20294a; border-radius: 14px; padding: 12px; }
     .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
@@ -58,6 +56,8 @@
     .empty { text-align:center; padding: 40px 10px; color: var(--muted) }
     .hidden{display:none !important}
     .fab{position:fixed; right:14px; bottom:14px; z-index:20;}
+    /* Make the sources list scroll inside the panel */
+    #sources-panel { max-height: 70vh; overflow: auto; -webkit-overflow-scrolling: touch; }
   </style>
 </head>
 <body>
@@ -87,10 +87,15 @@
             </div>
           </div>
         </div>
+
         <div class="panel" id="sources-panel">
           <div class="row" style="justify-content: space-between; align-items:center">
             <strong>Sources</strong>
-            <div class="stats"><span id="count">0</span> items</div>
+            <div class="row" style="gap:8px; align-items:center">
+              <button id="btn-select-all" class="chip" title="Enable all sources">Select all</button>
+              <button id="btn-deselect-all" class="chip" title="Disable all sources">Deselect all</button>
+              <div class="stats"><span id="count">0</span> items</div>
+            </div>
           </div>
           <div class="hint" style="margin:6px 0 10px">Toggle which feeds to include. Add/remove URLs below in the code if you want to customize.</div>
           <div id="sources"></div>
@@ -108,71 +113,55 @@
 
   <script>
     // --- Feed catalog -------------------------------------------------------
-    // You can add/remove feeds here. Each category has a list of sources.
-    // The app fetches RSS via the public AllOrigins proxy to avoid CORS issues.
     const FEEDS = {
-      AI: {
-        feeds: [
-          { name: 'OpenAI Blog', url: 'https://openai.com/blog/rss.xml' },
-          { name: 'Google AI Blog', url: 'https://ai.googleblog.com/atom.xml' },
-          { name: 'Meta AI', url: 'https://ai.facebook.com/blog/rss/' },
-          { name: 'ArXiv AI (cs.AI)', url: 'https://arxiv.org/rss/cs.AI' },
-          { name: 'MIT News – AI', url: 'https://news.mit.edu/rss/topic/artificial-intelligence2' },
-          { name: 'VentureBeat AI', url: 'https://venturebeat.com/category/ai/feed/' }
-        ]
-      },
-      Science: {
-        feeds: [
-          { name: 'NASA Breaking News', url: 'https://www.nasa.gov/news-release/feed/' },
-          { name: 'Nature – News', url: 'https://www.nature.com/subjects/science/news.rss' },
-          { name: 'ScienceDaily – Top Science', url: 'https://www.sciencedaily.com/rss/top/science.xml' },
-          { name: 'NOAA News', url: 'https://www.noaa.gov/news-features/feed' },
-          { name: 'Phys.org – Top News', url: 'https://phys.org/rss-feed/' }
-        ]
-      },
-      Tech: {
-        feeds: [
-          { name: 'TechCrunch', url: 'https://techcrunch.com/feed/' },
-          { name: 'The Verge – Tech', url: 'https://www.theverge.com/tech/rss/index.xml' },
-          { name: 'Ars Technica', url: 'https://feeds.arstechnica.com/arstechnica/index/' },
-          { name: 'Wired', url: 'https://www.wired.com/feed/rss' },
-          { name: 'IEEE Spectrum', url: 'https://spectrum.ieee.org/feed' }
-        ]
-      },
-      Cybersecurity: {
-        feeds: [
-          { name: 'The Hacker News', url: 'https://thehackernews.com/feeds/posts/default' },
-          { name: 'Krebs on Security', url: 'https://krebsonsecurity.com/feed/' },
-          { name: 'BleepingComputer', url: 'https://www.bleepingcomputer.com/feed/' },
-          { name: 'Schneier on Security', url: 'https://www.schneier.com/feed/atom/' }
-        ]
-      },
-      Gadgets: {
-        feeds: [
-          { name: 'Engadget', url: 'https://www.engadget.com/rss.xml' },
-          { name: 'Gizmodo', url: 'https://gizmodo.com/rss' },
-          { name: 'The Verge – Gadgets', url: 'https://www.theverge.com/rss/gadgets/index.xml' }
-        ]
-      },
-      'Dev & Open Source': {
-        feeds: [
-          { name: 'Hacker News – Front Page', url: 'https://hnrss.org/frontpage' },
-          { name: 'GitHub Blog', url: 'https://github.blog/feed/' },
-          { name: 'Stack Overflow Blog', url: 'https://stackoverflow.blog/feed/' }
-        ]
-      },
-      Hardware: {
-        feeds: [
-          { name: 'AnandTech', url: 'https://www.anandtech.com/rss' },
-          { name: "Tom's Hardware", url: 'https://www.tomshardware.com/feeds/all' },
-          { name: 'IEEE Spectrum – Semiconductors', url: 'https://spectrum.ieee.org/semiconductors/rss' }
-        ]
-      }
+      AI: { feeds: [
+        { name: 'OpenAI Blog', url: 'https://openai.com/blog/rss.xml' },
+        { name: 'Google AI Blog', url: 'https://ai.googleblog.com/atom.xml' },
+        { name: 'Meta AI', url: 'https://ai.facebook.com/blog/rss/' },
+        { name: 'ArXiv AI (cs.AI)', url: 'https://arxiv.org/rss/cs.AI' },
+        { name: 'MIT News – AI', url: 'https://news.mit.edu/rss/topic/artificial-intelligence2' },
+        { name: 'VentureBeat AI', url: 'https://venturebeat.com/category/ai/feed/' },
+      ]},
+      Science: { feeds: [
+        { name: 'NASA Breaking News', url: 'https://www.nasa.gov/news-release/feed/' },
+        { name: 'Nature – News', url: 'https://www.nature.com/subjects/science/news.rss' },
+        { name: 'ScienceDaily – Top Science', url: 'https://www.sciencedaily.com/rss/top/science.xml' },
+        { name: 'NOAA News', url: 'https://www.noaa.gov/news-features/feed' },
+        { name: 'Phys.org – Top News', url: 'https://phys.org/rss-feed/' },
+      ]},
+      Tech: { feeds: [
+        { name: 'TechCrunch', url: 'https://techcrunch.com/feed/' },
+        { name: 'The Verge – Tech', url: 'https://www.theverge.com/tech/rss/index.xml' },
+        { name: 'Ars Technica', url: 'https://feeds.arstechnica.com/arstechnica/index/' },
+        { name: 'Wired', url: 'https://www.wired.com/feed/rss' },
+        { name: 'IEEE Spectrum', url: 'https://spectrum.ieee.org/feed' },
+      ]},
+      Cybersecurity: { feeds: [
+        { name: 'The Hacker News', url: 'https://thehackernews.com/feeds/posts/default' },
+        { name: 'Krebs on Security', url: 'https://krebsonsecurity.com/feed/' },
+        { name: 'BleepingComputer', url: 'https://www.bleepingcomputer.com/feed/' },
+        { name: 'Schneier on Security', url: 'https://www.schneier.com/feed/atom/' },
+      ]},
+      Gadgets: { feeds: [
+        { name: 'Engadget', url: 'https://www.engadget.com/rss.xml' },
+        { name: 'Gizmodo', url: 'https://gizmodo.com/rss' },
+        { name: 'The Verge – Gadgets', url: 'https://www.theverge.com/rss/gadgets/index.xml' },
+      ]},
+      'Dev & Open Source': { feeds: [
+        { name: 'Hacker News – Front Page', url: 'https://hnrss.org/frontpage' },
+        { name: 'GitHub Blog', url: 'https://github.blog/feed/' },
+        { name: 'Stack Overflow Blog', url: 'https://stackoverflow.blog/feed/' },
+      ]},
+      Hardware: { feeds: [
+        { name: 'AnandTech', url: 'https://www.anandtech.com/rss' },
+        { name: "Tom's Hardware", url: 'https://www.tomshardware.com/feeds/all' },
+        { name: 'IEEE Spectrum – Semiconductors', url: 'https://spectrum.ieee.org/semiconductors/rss' },
+      ]},
     };
 
-    // --- UI state -----------------------------------------------------------
+    // --- State --------------------------------------------------------------
     const state = {
-      categories: new Set(['AI','Science','Tech','Cybersecurity','Gadgets','Dev & Open Source','Hardware']),
+      categories: new Set(Object.keys(FEEDS)),
       enabledFeeds: new Set(),
       items: [],
       showControls: true,
@@ -181,13 +170,13 @@
     // --- Helpers ------------------------------------------------------------
     const el = (sel) => document.querySelector(sel);
     const escapeHTML = (str='') => str.replace(/[&<>]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[s]));
+    const normalizeDate = (d) => { const t = Date.parse(d); return isNaN(t) ? 0 : t; };
 
     function formatDate(d){
       try{ return new Date(d).toLocaleString(undefined,{dateStyle:'medium', timeStyle:'short'}); }catch{ return d; }
     }
 
     function firstImageFrom(node){
-      // Try media:content or enclosure first; then scan HTML for <img>
       const media = node.querySelector('media\\:content, content, enclosure');
       if (media && media.getAttribute('url')) return media.getAttribute('url');
       const desc = node.querySelector('description, summary');
@@ -216,7 +205,7 @@
             image: firstImageFrom(item)
           });
         });
-      }else if (isAtom){
+      } else if (isAtom){
         doc.querySelectorAll('entry').forEach(entry => {
           const linkEl = entry.querySelector('link[rel="alternate"]') || entry.querySelector('link');
           out.push({
@@ -233,7 +222,6 @@
     }
 
     async function fetchFeed(url){
-      // Use AllOrigins to bypass CORS; it returns { contents, status }
       const proxied = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
       const res = await fetch(proxied);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -241,6 +229,7 @@
       return data.contents;
     }
 
+    // --- Renderers ----------------------------------------------------------
     function renderSources(){
       const sourcesEl = el('#sources');
       sourcesEl.innerHTML = '';
@@ -266,6 +255,12 @@
         group.appendChild(list);
         sourcesEl.appendChild(group);
       });
+
+      // Attach select/deselect events
+      const sel = document.getElementById('btn-select-all');
+      const desel = document.getElementById('btn-deselect-all');
+      if (sel) sel.onclick = ()=> setAllSources(true);
+      if (desel) desel.onclick = ()=> setAllSources(false);
     }
 
     function renderCategoryChips(){
@@ -326,11 +321,7 @@
       grid.appendChild(frag);
     }
 
-    function normalizeDate(d){
-      const t = Date.parse(d);
-      return isNaN(t) ? 0 : t;
-    }
-
+    // --- Filter/sort --------------------------------------------------------
     function applyFiltersSort(items){
       const q = el('#q').value.trim().toLowerCase();
       const sort = el('#sort').value;
@@ -341,7 +332,7 @@
       if (sort === 'new') out.sort((a,b)=> normalizeDate(b.date) - normalizeDate(a.date));
       if (sort === 'old') out.sort((a,b)=> normalizeDate(a.date) - normalizeDate(b.date));
       if (sort === 'az') out.sort((a,b)=> a.title.localeCompare(b.title));
-      return out.slice(0, 60); // cap
+      return out.slice(0, 60);
     }
 
     async function gatherSelectedFeeds(){
@@ -379,28 +370,46 @@
       }
     }
 
-    // --- Controls show/hide -------------------------------------------------
+    // --- Controls & bulk select --------------------------------------------
     function setControls(show){
       state.showControls = !!show;
       const wrap = document.getElementById('controls-wrap');
       if (wrap) wrap.classList.toggle('hidden', !state.showControls);
       const btn = document.getElementById('toggle-controls');
       if (btn) btn.textContent = state.showControls ? '▲ Hide controls' : '▼ Show controls';
+      if (state.showControls){
+        const sp = document.getElementById('sources-panel');
+        if (sp){ sp.scrollTop = 0; sp.focus?.(); }
+        document.querySelector('header')?.scrollIntoView({behavior:'smooth', block:'start'});
+      }
+    }
+
+    function setAllSources(checked){
+      Object.entries(FEEDS).forEach(([cat, obj]) => {
+        obj.feeds.forEach(f => {
+          const id = `${cat}::${f.name}`;
+          if (checked) state.enabledFeeds.add(id); else state.enabledFeeds.delete(id);
+        });
+      });
+      document.querySelectorAll('#sources input[type="checkbox"]').forEach(cb => cb.checked = checked);
     }
 
     // --- Init ---------------------------------------------------------------
     (function init(){
-      // default-enable all feeds
+      // enable everything by default
       Object.entries(FEEDS).forEach(([cat, obj]) => {
         obj.feeds.forEach(f => state.enabledFeeds.add(`${cat}::${f.name}`));
       });
+
       renderCategoryChips();
       renderSources();
+
       el('#refresh').addEventListener('click', ()=>{ setControls(false); fetchAll(); });
       el('#q').addEventListener('input', ()=> renderItems(applyFiltersSort(state.items)) );
       el('#sort').addEventListener('change', ()=> renderItems(applyFiltersSort(state.items)) );
       el('#toggle-controls').addEventListener('click', ()=> setControls(!state.showControls));
       const fabBtn = document.getElementById('fab'); if (fabBtn) fabBtn.addEventListener('click', ()=> setControls(!state.showControls));
+
       // First fetch
       fetchAll();
     })();
