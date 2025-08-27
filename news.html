@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tech & Science News – Pick Your Feeds</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #12182b;
+      --panel-2: #0f1527;
+      --text: #e7ecff;
+      --muted: #9fb0ffcc;
+      --accent: #7aa2ff;
+      --chip: #1b2340;
+      --card: #0f1527;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+      background: linear-gradient(180deg, var(--bg), #070a14 40%);
+      color: var(--text);
+    }
+    header {
+      position: sticky; top: 0; z-index: 5;
+      background: linear-gradient(180deg, rgba(7,10,20,.95), rgba(7,10,20,.75));
+      backdrop-filter: blur(6px);
+      border-bottom: 1px solid #1f2746;
+    }
+    .container { max-width: 1100px; margin: 0 auto; padding: 18px 18px; }
+    h1 { font-size: 1.35rem; margin: 0 0 10px; letter-spacing:.2px }
+    .controls {
+      display: grid; gap: 10px; grid-template-columns: 1fr; align-items: start;
+    }
+    @media (min-width: 800px){ .controls{ grid-template-columns: 2.2fr 1fr; } }
+    .panel { background: var(--panel); border: 1px solid #20294a; border-radius: 14px; padding: 12px; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .search { display:flex; gap:8px; }
+    input[type="text"] { flex:1; padding:10px 12px; border-radius:10px; border:1px solid #223160; background:#0a0f21; color:var(--text) }
+    select, button { padding:10px 12px; border-radius:10px; border:1px solid #223160; background:#0a0f21; color:var(--text); cursor:pointer }
+    button.primary { background: linear-gradient(180deg,#2a3c7d,#24356d); border-color:#2d3f80 }
+    .chips { display:flex; gap:8px; flex-wrap: wrap; }
+    .chip { display:inline-flex; align-items:center; gap:6px; padding: 8px 10px; border-radius:999px; background: var(--chip); border:1px solid #23315f; font-size:.92rem }
+    .chip input { accent-color: var(--accent); }
+    .hint{ color: var(--muted); font-size:.9rem }
+    .stats { color: var(--muted); font-size:.9rem; }
+    .grid { display:grid; grid-template-columns: 1fr; gap: 14px; margin-top: 14px }
+    @media (min-width: 700px){ .grid{ grid-template-columns: 1fr 1fr; } }
+    @media (min-width: 1024px){ .grid{ grid-template-columns: 1fr 1fr 1fr; } }
+    .card { background: var(--card); border:1px solid #1c2546; border-radius: 16px; overflow:hidden; display:flex; flex-direction: column; min-height: 100px }
+    .thumb { width:100%; height: 160px; object-fit: cover; background:#0b0f1f }
+    .content { padding: 12px }
+    .meta { display:flex; justify-content: space-between; align-items:center; gap:8px; color: var(--muted); font-size:.85rem; margin-bottom:6px }
+    .title a { color: var(--text); text-decoration: none; font-weight: 600 }
+    .title a:hover { text-decoration: underline }
+    .desc { color: #cdd6ff; font-size:.95rem }
+    .footer { display:flex; justify-content: space-between; align-items:center; gap:8px; margin-top:auto; padding: 12px; border-top:1px solid #1a2240; color: var(--muted); font-size:.85rem }
+    .empty { text-align:center; padding: 40px 10px; color: var(--muted) }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>Latest Tech & Science Headlines</h1>
+      <div class="controls">
+        <div class="panel">
+          <div class="row" style="justify-content:space-between; align-items: start">
+            <div>
+              <div class="hint">Choose categories (you can toggle sources inside each)</div>
+              <div class="chips" id="category-chips"></div>
+            </div>
+            <div class="search">
+              <input id="q" type="text" placeholder="Filter by keyword (e.g., 'quantum', 'LLM', 'NASA')"/>
+              <select id="sort">
+                <option value="new">Newest first</option>
+                <option value="old">Oldest first</option>
+                <option value="az">Title A→Z</option>
+              </select>
+              <button class="primary" id="refresh">Fetch</button>
+            </div>
+          </div>
+        </div>
+        <div class="panel" id="sources-panel">
+          <div class="row" style="justify-content: space-between; align-items:center">
+            <strong>Sources</strong>
+            <div class="stats"><span id="count">0</span> items</div>
+          </div>
+          <div class="hint" style="margin:6px 0 10px">Toggle which feeds to include. Add/remove URLs below in the code if you want to customize.</div>
+          <div id="sources"></div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="grid" id="grid"></div>
+    <div class="empty" id="empty" style="display:none">No stories matched your filters. Try a different category, sources, or keyword.</div>
+  </main>
+
+  <script>
+    // --- Feed catalog -------------------------------------------------------
+    // You can add/remove feeds here. Each category has a list of sources.
+    // The app fetches RSS via the public AllOrigins proxy to avoid CORS issues.
+    const FEEDS = {
+      AI: {
+        feeds: [
+          { name: 'OpenAI Blog', url: 'https://openai.com/blog/rss.xml' },
+          { name: 'Google AI Blog', url: 'https://ai.googleblog.com/atom.xml' },
+          { name: 'Meta AI', url: 'https://ai.facebook.com/blog/rss/' },
+          { name: 'ArXiv AI (cs.AI)', url: 'https://arxiv.org/rss/cs.AI' },
+          { name: 'MIT News – AI', url: 'https://news.mit.edu/rss/topic/artificial-intelligence2' },
+          { name: 'VentureBeat AI', url: 'https://venturebeat.com/category/ai/feed/' },
+        ]
+      },
+      Science: {
+        feeds: [
+          { name: 'NASA Breaking News', url: 'https://www.nasa.gov/news-release/feed/' },
+          { name: 'Nature – News', url: 'https://www.nature.com/subjects/science/news.rss' },
+          { name: 'ScienceDaily – Top Science', url: 'https://www.sciencedaily.com/rss/top/science.xml' },
+          { name: 'NOAA News', url: 'https://www.noaa.gov/news-features/feed' },
+          { name: 'Phys.org – Top News', url: 'https://phys.org/rss-feed/' },
+        ]
+      },
+      Tech: {
+        feeds: [
+          { name: 'TechCrunch', url: 'https://techcrunch.com/feed/' },
+          { name: 'The Verge – Tech', url: 'https://www.theverge.com/tech/rss/index.xml' },
+          { name: 'Ars Technica', url: 'https://feeds.arstechnica.com/arstechnica/index/' },
+          { name: 'Wired', url: 'https://www.wired.com/feed/rss' },
+          { name: 'IEEE Spectrum', url: 'https://spectrum.ieee.org/feed' },
+        ]
+      }
+    };
+
+    // --- UI state -----------------------------------------------------------
+    const state = {
+      categories: new Set(['AI','Science','Tech']),
+      enabledFeeds: new Set(), // filled on init
+      items: [],
+    };
+
+    // --- Helpers ------------------------------------------------------------
+    const el = (sel) => document.querySelector(sel);
+    const escapeHTML = (str='') => str.replace(/[&<>]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[s]));
+
+    function formatDate(d){
+      try{ return new Date(d).toLocaleString(undefined,{dateStyle:'medium', timeStyle:'short'}); }catch{ return d; }
+    }
+
+    function firstImageFrom(node){
+      // Try media:content or enclosure first; then scan HTML for <img>
+      const media = node.querySelector('media\\:content, content, enclosure');
+      if (media && media.getAttribute('url')) return media.getAttribute('url');
+      const desc = node.querySelector('description, summary');
+      if (desc){
+        const tmp = document.createElement('div');
+        tmp.innerHTML = desc.textContent;
+        const img = tmp.querySelector('img');
+        if (img && img.src) return img.src;
+      }
+      return '';
+    }
+
+    function parseRSS(xmlText, fallbackSource){
+      const doc = new DOMParser().parseFromString(xmlText, 'text/xml');
+      const isRSS = doc.querySelector('rss, RDF, rdf\\:RDF');
+      const isAtom = doc.querySelector('feed');
+      const out = [];
+      if (isRSS){
+        doc.querySelectorAll('item').forEach(item => {
+          out.push({
+            title: item.querySelector('title')?.textContent?.trim() || 'Untitled',
+            link: item.querySelector('link')?.textContent?.trim() || '#',
+            date: item.querySelector('pubDate')?.textContent || item.querySelector('dc\\:date')?.textContent || '',
+            source: doc.querySelector('channel > title')?.textContent?.trim() || fallbackSource,
+            desc: item.querySelector('description')?.textContent || '',
+            image: firstImageFrom(item)
+          });
+        });
+      }else if (isAtom){
+        doc.querySelectorAll('entry').forEach(entry => {
+          const linkEl = entry.querySelector('link[rel="alternate"]') || entry.querySelector('link');
+          out.push({
+            title: entry.querySelector('title')?.textContent?.trim() || 'Untitled',
+            link: linkEl?.getAttribute('href') || '#',
+            date: entry.querySelector('updated')?.textContent || entry.querySelector('published')?.textContent || '',
+            source: doc.querySelector('feed > title')?.textContent?.trim() || fallbackSource,
+            desc: entry.querySelector('summary')?.textContent || entry.querySelector('content')?.textContent || '',
+            image: firstImageFrom(entry)
+          });
+        });
+      }
+      return out;
+    }
+
+    async function fetchFeed(url){
+      // Use AllOrigins to bypass CORS; it returns { contents, status }
+      const proxied = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+      const res = await fetch(proxied);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      return data.contents;
+    }
+
+    function renderSources(){
+      const sourcesEl = el('#sources');
+      sourcesEl.innerHTML = '';
+      Object.entries(FEEDS).forEach(([cat, obj]) => {
+        // category toggle chip
+        // (chip UI built in header; sources list here)
+        const group = document.createElement('div');
+        group.style.marginBottom = '10px';
+        const h = document.createElement('div');
+        h.innerHTML = `<strong>${cat}</strong>`;
+        group.appendChild(h);
+        const list = document.createElement('div');
+        list.className = 'chips';
+        obj.feeds.forEach(f => {
+          const id = `${cat}::${f.name}`;
+          const wrap = document.createElement('label');
+          wrap.className = 'chip';
+          wrap.innerHTML = `<input type="checkbox" ${state.enabledFeeds.has(id)?'checked':''}/> <span>${escapeHTML(f.name)}</span>`;
+          const checkbox = wrap.querySelector('input');
+          checkbox.addEventListener('change', () => {
+            if (checkbox.checked) state.enabledFeeds.add(id); else state.enabledFeeds.delete(id);
+          });
+          list.appendChild(wrap);
+        });
+        group.appendChild(list);
+        sourcesEl.appendChild(group);
+      });
+    }
+
+    function renderCategoryChips(){
+      const chips = el('#category-chips');
+      chips.innerHTML = '';
+      Object.keys(FEEDS).forEach(cat => {
+        const lab = document.createElement('label');
+        lab.className = 'chip';
+        lab.innerHTML = `<input type="checkbox" ${state.categories.has(cat)?'checked':''}/> <span>${cat}</span>`;
+        const cb = lab.querySelector('input');
+        cb.addEventListener('change', ()=>{
+          if(cb.checked) state.categories.add(cat); else state.categories.delete(cat);
+        });
+        chips.appendChild(lab);
+      });
+    }
+
+    function renderItems(items){
+      const grid = el('#grid');
+      const empty = el('#empty');
+      grid.innerHTML = '';
+      el('#count').textContent = items.length;
+      if (!items.length){ empty.style.display='block'; return; }
+      empty.style.display='none';
+      const frag = document.createDocumentFragment();
+      items.forEach(it => {
+        const card = document.createElement('article');
+        card.className = 'card';
+        if (it.image){
+          const img = document.createElement('img');
+          img.className = 'thumb';
+          img.loading = 'lazy';
+          img.alt = '';
+          img.src = it.image;
+          card.appendChild(img);
+        }
+        const content = document.createElement('div');
+        content.className = 'content';
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        meta.innerHTML = `<span>${escapeHTML(it.source)}</span><span>${escapeHTML(formatDate(it.date))}</span>`;
+        const title = document.createElement('div');
+        title.className = 'title';
+        title.innerHTML = `<a href="${it.link}" target="_blank" rel="noopener">${escapeHTML(it.title)}</a>`;
+        const desc = document.createElement('div');
+        desc.className = 'desc';
+        desc.textContent = it.desc.replace(/<[^>]+>/g,'').slice(0,220) + (it.desc.length>220?'…':'');
+        content.appendChild(meta);
+        content.appendChild(title);
+        content.appendChild(desc);
+        card.appendChild(content);
+        const footer = document.createElement('div');
+        footer.className = 'footer';
+        footer.innerHTML = `<span>Source feed</span><span>↗</span>`;
+        card.appendChild(footer);
+        frag.appendChild(card);
+      });
+      grid.appendChild(frag);
+    }
+
+    function normalizeDate(d){
+      const t = Date.parse(d);
+      return isNaN(t) ? 0 : t;
+    }
+
+    function applyFiltersSort(items){
+      const q = el('#q').value.trim().toLowerCase();
+      const sort = el('#sort').value;
+      let out = items;
+      if (q){
+        out = out.filter(it => (it.title+" "+it.desc+" "+it.source).toLowerCase().includes(q));
+      }
+      if (sort === 'new') out.sort((a,b)=> normalizeDate(b.date) - normalizeDate(a.date));
+      if (sort === 'old') out.sort((a,b)=> normalizeDate(a.date) - normalizeDate(b.date));
+      if (sort === 'az') out.sort((a,b)=> a.title.localeCompare(b.title));
+      return out.slice(0, 60); // cap
+    }
+
+    async function gatherSelectedFeeds(){
+      const selected = [];
+      Object.entries(FEEDS).forEach(([cat, obj]) => {
+        if (!state.categories.has(cat)) return;
+        obj.feeds.forEach(f => {
+          const id = `${cat}::${f.name}`;
+          if (state.enabledFeeds.has(id)) selected.push({cat, ...f});
+        });
+      });
+      return selected;
+    }
+
+    async function fetchAll(){
+      const grid = el('#grid');
+      grid.innerHTML = '<div class="empty">Fetching feeds…</div>';
+      try {
+        const selected = await gatherSelectedFeeds();
+        const results = await Promise.allSettled(selected.map(async src => {
+          const xml = await fetchFeed(src.url);
+          const items = parseRSS(xml, src.name).map(i=>({ ...i, category: src.cat }));
+          return items;
+        }));
+        const merged = results.flatMap(r => r.status==='fulfilled' ? r.value : []);
+        state.items = merged;
+        renderItems(applyFiltersSort(merged));
+      } catch (e){
+        console.error(e);
+        el('#grid').innerHTML = '<div class="empty">Failed to fetch one or more feeds. Try again.</div>';
+      }
+    }
+
+    // --- Init ---------------------------------------------------------------
+    (function init(){
+      // default-enable all feeds
+      Object.entries(FEEDS).forEach(([cat, obj]) => {
+        obj.feeds.forEach(f => state.enabledFeeds.add(`${cat}::${f.name}`));
+      });
+      renderCategoryChips();
+      renderSources();
+      el('#refresh').addEventListener('click', fetchAll);
+      el('#q').addEventListener('input', ()=> renderItems(applyFiltersSort(state.items)) );
+      el('#sort').addEventListener('change', ()=> renderItems(applyFiltersSort(state.items)) );
+      // First fetch
+      fetchAll();
+    })();
+  </script>
+</body>
+</html>
