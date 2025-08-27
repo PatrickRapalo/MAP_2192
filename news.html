@@ -57,7 +57,7 @@
     .footer { display:flex; justify-content: space-between; align-items:center; gap:8px; margin-top:auto; padding: 12px; border-top:1px solid #1a2240; color: var(--muted); font-size:.85rem }
     .empty { text-align:center; padding: 40px 10px; color: var(--muted) }
     .hidden{display:none !important}
-  .fab{position:fixed; right:14px; bottom:14px; z-index:20;}
+    .fab{position:fixed; right:14px; bottom:14px; z-index:20;}
   </style>
 </head>
 <body>
@@ -67,7 +67,36 @@
         <h1>Latest Tech & Science Headlines</h1>
         <button id="toggle-controls" class="primary" style="white-space:nowrap">▲ Hide controls</button>
       </div>
-      <div id="controls-wrap" class="controls">$1</div>
+
+      <!-- CONTROLS -->
+      <div id="controls-wrap" class="controls">
+        <div class="panel">
+          <div class="row" style="justify-content:space-between; align-items: start">
+            <div>
+              <div class="hint">Choose categories (you can toggle sources inside each)</div>
+              <div class="chips" id="category-chips"></div>
+            </div>
+            <div class="search">
+              <input id="q" type="text" placeholder="Filter by keyword (e.g., 'quantum', 'LLM', 'NASA')"/>
+              <select id="sort">
+                <option value="new">Newest first</option>
+                <option value="old">Oldest first</option>
+                <option value="az">Title A→Z</option>
+              </select>
+              <button class="primary" id="refresh">Fetch</button>
+            </div>
+          </div>
+        </div>
+        <div class="panel" id="sources-panel">
+          <div class="row" style="justify-content: space-between; align-items:center">
+            <strong>Sources</strong>
+            <div class="stats"><span id="count">0</span> items</div>
+          </div>
+          <div class="hint" style="margin:6px 0 10px">Toggle which feeds to include. Add/remove URLs below in the code if you want to customize.</div>
+          <div id="sources"></div>
+        </div>
+      </div>
+      <!-- /CONTROLS -->
     </div>
   </header>
 
@@ -75,8 +104,9 @@
     <div class="grid" id="grid"></div>
     <div class="empty" id="empty" style="display:none">No stories matched your filters. Try a different category, sources, or keyword.</div>
   </main>
-    <button class="primary fab" id="fab" title="Show/Hide filters">Filters</button>
-    <script>
+  <button class="primary fab" id="fab" title="Show/Hide filters">Filters</button>
+
+  <script>
     // --- Feed catalog -------------------------------------------------------
     // You can add/remove feeds here. Each category has a list of sources.
     // The app fetches RSS via the public AllOrigins proxy to avoid CORS issues.
@@ -215,8 +245,6 @@
       const sourcesEl = el('#sources');
       sourcesEl.innerHTML = '';
       Object.entries(FEEDS).forEach(([cat, obj]) => {
-        // category toggle chip
-        // (chip UI built in header; sources list here)
         const group = document.createElement('div');
         group.style.marginBottom = '10px';
         const h = document.createElement('div');
