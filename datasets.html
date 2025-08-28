@@ -3,14 +3,17 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Dataset & Web Extractor — Column Builder + Discovery</title>
+  <title>Combined Dataset Finder + Web Extractor</title>
   <style>
-    :root{--bg:#0b1020;--panel:#12182b;--text:#e7ecff;--muted:#a9b7ffcc;--chip:#1b2340;--card:#0f1527}
+    :root{--bg:#0b1020;--panel:#12182b;--text:#e7ecff;--muted:#a9b7ffcc;--chip:#1b2340;--card:#0f1527;--accent:#7aa2ff}
     *{box-sizing:border-box}
     body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Helvetica Neue,Arial,Noto Sans,sans-serif;background:linear-gradient(180deg,var(--bg),#070a14 40%);color:var(--text)}
     header{position:sticky;top:0;z-index:5;background:linear-gradient(180deg,rgba(7,10,20,.95),rgba(7,10,20,.75));backdrop-filter:blur(6px);border-bottom:1px solid #1f2746}
     .container{max-width:1200px;margin:0 auto;padding:18px}
     h1{font-size:1.35rem;margin:0 0 10px}
+    .tabs{display:flex;gap:10px;flex-wrap:wrap}
+    .tab{padding:8px 12px;border:1px solid #23315f;border-radius:999px;background:#0a0f21;color:var(--text);cursor:pointer}
+    .tab.active{background:linear-gradient(180deg,#2a3c7d,#24356d);border-color:#2d3f80}
     .panel{background:var(--panel);border:1px solid #20294a;border-radius:14px;padding:12px}
     .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
     input,select,button,textarea{padding:10px 12px;border-radius:10px;border:1px solid #223160;background:#0a0f21;color:var(--text)}
@@ -19,101 +22,313 @@
     .chips{display:flex;gap:8px;flex-wrap:wrap}
     .chip{display:inline-flex;align-items:center;gap:6px;padding:8px 10px;border-radius:999px;background:var(--chip);border:1px solid #23315f;font-size:.92rem}
     .grid{display:grid;gap:14px}
-    @media(min-width:1100px){.grid-3{grid-template-columns:2fr 1.6fr 1.4fr}}
+    @media(min-width:1000px){.grid-2{grid-template-columns:2.2fr 1fr}}
+    @media(min-width:1100px){.grid-3{grid-template-columns:2fr 1.4fr 1.4fr}}
     .card{background:var(--card);border:1px solid #1c2546;border-radius:16px;overflow:hidden}
     .content{padding:12px}
-    .table{width:100%;border-collapse:collapse}
-    .table th,.table td{border-bottom:1px solid #1a2240;padding:8px;text-align:left;vertical-align:top}
+    .title a{color:var(--text);text-decoration:none;font-weight:600}
+    .title a:hover{text-decoration:underline}
+    .meta{display:flex;justify-content:space-between;align-items:center;gap:8px;color:var(--muted);font-size:.85rem;margin-bottom:6px}
     .empty{text-align:center;padding:28px 10px;color:var(--muted)}
     .hidden{display:none!important}
     .scroll{max-height:60vh;overflow:auto;-webkit-overflow-scrolling:touch}
     .small{font-size:.9rem}
-    .col-grid{display:grid;grid-template-columns:1.2fr 1fr 0.9fr 1fr 1fr auto;gap:8px;align-items:center}
-    .col-grid input[type="text"], .col-grid select{width:100%}
-    .mono{font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace; font-size:.85rem}
+    .mono{font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; font-size:.85rem}
+    .table{width:100%;border-collapse:collapse}
+    .table th,.table td{border-bottom:1px solid #1a2240;padding:8px;text-align:left;vertical-align:top}
   </style>
 </head>
 <body>
   <header>
     <div class="container">
-      <h1>Dataset & Web Extractor — Column Builder + Discovery</h1>
+      <h1>Combined Dataset Finder + Web Extractor</h1>
+      <div class="tabs">
+        <button class="tab active" data-tab="datasets">Find Datasets</button>
+        <button class="tab" data-tab="extract">Web Extractor</button>
+      </div>
     </div>
   </header>
 
   <main class="container">
-    <div class="panel">
-      <div class="row" style="align-items:flex-start;justify-content:space-between">
-        <div style="flex:2 1 520px">
-          <div class="hint">Load a public page, then either <strong>discover</strong> likely containers/fields or manually build columns.</div>
-          <div class="row" style="margin-top:8px">
-            <input id="page-url" type="url" placeholder="https://example.com/list-or-article" style="flex:1"/>
-            <button id="load-page" class="primary">Load</button>
-            <button id="discover" title="Analyze the page for repeating containers & fields">Discover</button>
+    <!-- ===================== DATASET FINDER ===================== -->
+    <section id="tab-datasets">
+      <div class="panel">
+        <div class="row" style="align-items:flex-start;justify-content:space-between">
+          <div style="flex:2 1 620px">
+            <div class="small" style="opacity:.9">Search multiple catalogs (Data.gov, Socrata, Zenodo, UK/EU, etc.). Choose format to narrow files (CSV/JSON…).</div>
+            <div class="row" style="margin-top:8px">
+              <input id="ds-q" style="flex:1" placeholder="e.g., traffic collisions, climate anomalies, LLM benchmarks"/>
+              <select id="ds-format">
+                <option value="">Any format</option>
+                <option value="csv">CSV</option>
+                <option value="json">JSON</option>
+                <option value="geojson">GeoJSON</option>
+                <option value="xlsx">XLSX/XLS</option>
+                <option value="zip">ZIP</option>
+                <option value="parquet">Parquet</option>
+              </select>
+              <button id="ds-search" class="primary">Search</button>
+            </div>
+            <div id="ds-source-chips" class="chips" style="margin-top:8px"></div>
+            <div class="row small" style="gap:8px;margin-top:6px">
+              <button id="ds-select-all" class="chip">Select all</button>
+              <button id="ds-deselect-all" class="chip">Deselect all</button>
+              <button id="ds-adv-toggle" class="chip" title="Show/hide advanced filters">Advanced ▾</button>
+              <span class="small" id="ds-count">0 results</span>
+            </div>
+            <div id="ds-advanced" class="row hidden" style="gap:10px;margin-top:6px">
+              <label class="chip" title="Only show items with direct file links (CSV, JSON, etc.)">
+                <input type="checkbox" id="ds-only-direct"/> direct downloads only
+              </label>
+              <label class="chip" title="Only items updated/published after this date">
+                Updated after <input type="date" id="ds-updated-after" style="margin-left:6px;background:#0a0f21;color:var(--text);border:1px solid #223160;border-radius:8px;padding:6px 8px"/>
+              </label>
+            </div>
           </div>
-          <div id="page-meta" class="small" style="margin-top:6px;color:var(--muted)"></div>
-        </div>
-        <div class="row" style="flex:1 1 340px; justify-content:flex-end">
-          <label class="chip"><input type="checkbox" id="dedupe" checked/> deduplicate rows</label>
-          <label class="chip"><input type="checkbox" id="absolute" checked/> make links absolute</label>
-          <button id="extract" class="primary">Extract</button>
+          <div class="panel" style="flex:1 1 320px">
+            <div class="small" style="opacity:.9;margin-bottom:6px">Quick scan: paste a page that lists datasets to sniff direct file links.</div>
+            <div class="row">
+              <input id="ds-scrape-url" type="url" placeholder="https://example.com/datasets" style="flex:1"/>
+              <button id="ds-scrape">Scrape</button>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
 
-    <div class="grid grid-3" style="margin-top:12px">
-      <!-- Column Builder -->
-      <section class="panel">
-        <div class="row" style="margin-bottom:6px;align-items:center">
-          <strong>Column Builder</strong>
-          <input id="container-sel" placeholder="Container CSS (optional, e.g., .card, article, table tbody tr)" style="flex:1"/>
-          <button id="add-col" class="chip">+ Add column</button>
-          <button id="clear-cols" class="chip">Clear</button>
-          <button id="preset-imdb" title="title/url/year/rating for common IMDb lists">Preset: IMDb</button>
-        </div>
-        <div id="cols" class="scroll"></div>
-      </section>
-
-      <!-- Discovery: Containers & Fields -->
-      <section class="panel">
-        <strong>Discover Containers</strong>
-        <div id="containers" class="scroll" style="margin-top:6px"></div>
-      </section>
-
-      <section class="panel">
-        <strong>Field Suggestions</strong>
-        <div id="fields" class="scroll" style="margin-top:6px"></div>
-      </section>
-    </div>
-
-    <section class="panel" style="margin-top:12px">
-      <div class="row" style="justify-content:space-between;align-items:center">
-        <div class="hint">Preview (<span id="row-count">0</span> rows)</div>
+      <div class="row" style="justify-content:space-between;align-items:center;margin:10px 0">
+        <div class="small" style="opacity:.9">Results</div>
         <div class="row" style="gap:8px">
-          <button id="download-json">Download JSON</button>
-          <button id="download-csv">Download CSV</button>
+          <button id="ds-download-json">Download JSON</button>
+          <button id="ds-download-csv">Download CSV</button>
         </div>
       </div>
-      <div class="scroll">
-        <table class="table" id="ex-table"></table>
+
+      <div id="ds-results" class="grid"></div>
+      <div id="ds-empty" class="empty hidden">No results yet. Try a broader query or enable more sources.</div>
+    </section>
+
+    <!-- ===================== WEB EXTRACTOR ===================== -->
+    <section id="tab-extract" class="hidden">
+      <div class="panel">
+        <div class="row" style="align-items:flex-start;justify-content:space-between">
+          <div style="flex:2 1 520px">
+            <div class="small" style="opacity:.9">Load a page, auto-discover containers & fields, or define your own columns. Download as JSON/CSV.</div>
+            <div class="row" style="margin-top:8px">
+              <input id="ex-page-url" type="url" placeholder="https://example.com/list-or-article" style="flex:1"/>
+              <button id="ex-load" class="primary">Load</button>
+              <button id="ex-discover" title="Analyze the page for repeating blocks">Discover</button>
+            </div>
+            <div id="ex-page-meta" class="small" style="margin-top:6px;color:var(--muted)"></div>
+          </div>
+          <div class="row" style="flex:1 1 340px; justify-content:flex-end">
+            <label class="chip"><input type="checkbox" id="ex-dedupe" checked/> deduplicate</label>
+            <label class="chip"><input type="checkbox" id="ex-absolute" checked/> absolute links</label>
+            <button id="ex-extract" class="primary">Extract</button>
+          </div>
+        </div>
       </div>
+
+      <div class="grid grid-3" style="margin-top:12px">
+        <section class="panel">
+          <div class="row" style="margin-bottom:6px;align-items:center">
+            <strong>Column Builder</strong>
+            <input id="ex-container-sel" placeholder="Container CSS (optional, e.g., .card, article, table tbody tr)" style="flex:1"/>
+            <button id="ex-add-col" class="chip">+ Add column</button>
+            <button id="ex-clear-cols" class="chip">Clear</button>
+            <button id="ex-preset-imdb" title="title/url/year/rating for common IMDb lists">Preset: IMDb</button>
+          </div>
+          <div id="ex-cols" class="scroll"></div>
+        </section>
+
+        <section class="panel">
+          <strong>Discover Containers</strong>
+          <div id="ex-containers" class="scroll" style="margin-top:6px"></div>
+        </section>
+
+        <section class="panel">
+          <strong>Field Suggestions</strong>
+          <div id="ex-fields" class="scroll" style="margin-top:6px"></div>
+        </section>
+      </div>
+
+      <section class="panel" style="margin-top:12px">
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <div class="small" style="opacity:.9">Preview (<span id="ex-row-count">0</span> rows)</div>
+          <div class="row" style="gap:8px">
+            <button id="ex-download-json">Download JSON</button>
+            <button id="ex-download-csv">Download CSV</button>
+          </div>
+        </div>
+        <div class="scroll">
+          <table class="table" id="ex-table"></table>
+        </div>
+      </section>
     </section>
   </main>
 
   <script>
-    let PAGE = { url:'', html:'', doc:null };
-    const parser = new DOMParser();
-    const el = s=>document.querySelector(s);
+    // ----- Tab logic -----
+    const tabs = document.querySelectorAll('.tab');
+    tabs.forEach(t=> t.addEventListener('click', ()=>{
+      tabs.forEach(x=>x.classList.remove('active'));
+      t.classList.add('active');
+      document.getElementById('tab-datasets').classList.toggle('hidden', t.dataset.tab!=='datasets');
+      document.getElementById('tab-extract').classList.toggle('hidden', t.dataset.tab!=='extract');
+    }));
 
+    const el = s=>document.querySelector(s);
+    const normalizeDate = d=>{ const t=Date.parse(d); return isNaN(t)?0:t };
+    const escape = s=> (''+(s??'')).replace(/[&<>]/g, x=> ({'&':'&amp;','<':'&lt;','>':'&gt;'}[x]));
+    async function fetchJSON(url){ const r=await fetch(url); if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }
+    async function fetchProxied(url){ const r=await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`); if(!r.ok) throw new Error('HTTP '+r.status); return (await r.json()).contents || ''; }
     function toAbs(url, base){ try{ return new URL(url, base).toString(); }catch{ return url; } }
     function download(filename, text){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([text],{type:'application/octet-stream'})); a.download=filename; a.click(); }
-    function toCSV(rows){ if(!rows.length) return ''; const cols=[...new Set(rows.flatMap(r=>Object.keys(r)))]; const esc=v=>(''+(v??'')).replace(/"/g,'""'); return [cols.join(','), ...rows.map(r=> cols.map(c=>`"${esc(r[c])}"`).join(','))].join('\n'); }
+    function toCSV(rows){ if(!rows.length) return ''; const cols=[...new Set(rows.flatMap(r=>Object.keys(r)))]; const esc2=v=>(''+(v??'')).replace(/"/g,'""'); return [cols.join(','), ...rows.map(r=> cols.map(c=>`"${esc2(r[c])}"`).join(','))].join('\n'); }
 
-    function colRow(def={name:'title', selector:'', attr:'text', regex:'', replace:'', required:false}){
-      const wrap=document.createElement('div'); wrap.className='col-grid'; wrap.style.margin='6px 0';
-      wrap.innerHTML = `
-        <input type="text" class="col-name" placeholder="Column name" value="${def.name||''}"/>
-        <input type="text" class="col-sel mono" placeholder="Selector (relative)" value="${def.selector||''}"/>
-        <select class="col-attr">
+    // ===================== DATASET FINDER =====================
+    const DS = { items: [], catalogs: {
+      'Data.gov (US)': { id:'datagov', enabled:true },
+      'Socrata Catalog': { id:'socrata', enabled:true },
+      'Zenodo': { id:'zenodo', enabled:true },
+      'data.gov.uk (UK)': { id:'datagovuk', enabled:false },
+      'EU Open Data': { id:'euodp', enabled:false },
+      'Harvard Dataverse': { id:'dataverse', enabled:false },
+      'Figshare': { id:'figshare', enabled:false },
+      'World Bank (beta)': { id:'worldbank', enabled:false },
+    }};
+
+    // Build source chips
+    const dsChips = document.getElementById('ds-source-chips');
+    Object.entries(DS.catalogs).forEach(([name,obj])=>{
+      const lab=document.createElement('label'); lab.className='chip';
+      lab.innerHTML = `<input type="checkbox" ${obj.enabled?'checked':''}/> <span>${name}</span>`;
+      const cb=lab.querySelector('input'); cb.addEventListener('change', ()=> obj.enabled = cb.checked);
+      dsChips.appendChild(lab);
+    });
+    document.getElementById('ds-select-all').onclick=()=>{ Object.values(DS.catalogs).forEach(o=>o.enabled=true); dsChips.querySelectorAll('input').forEach(cb=>cb.checked=true) };
+    document.getElementById('ds-deselect-all').onclick=()=>{ Object.values(DS.catalogs).forEach(o=>o.enabled=false); dsChips.querySelectorAll('input').forEach(cb=>cb.checked=false) };
+    document.getElementById('ds-adv-toggle').onclick=()=>{ el('#ds-advanced').classList.toggle('hidden'); };
+
+    function dsSetCount(n){ el('#ds-count').textContent = `${n} results`; }
+
+    function dsRender(items){
+      const box = document.getElementById('ds-results'); box.innerHTML='';
+      dsSetCount(items.length);
+      if(!items.length){ document.getElementById('ds-empty').classList.remove('hidden'); return; }
+      document.getElementById('ds-empty').classList.add('hidden');
+      const frag=document.createDocumentFragment();
+      items.forEach(it=>{
+        const art=document.createElement('article'); art.className='card';
+        art.innerHTML = `<div class="content">
+          <div class="meta"><span>${escape(it.source||'')}</span><span>${it.date? new Date(it.date).toLocaleDateString():''}</span></div>
+          <div class="title"><a href="${it.link}" target="_blank" rel="noopener">${escape(it.title||'Untitled dataset')}</a></div>
+          <div class="small" style="margin-top:6px;opacity:.92">${escape((it.description||'').replace(/\s+/g,' ').slice(0,220))}${(it.description||'').length>220?'…':''}</div>
+          ${ (it.formats&&it.formats.length) ? `<div class="chips" style="margin-top:8px">${it.formats.slice(0,8).map(f=>`<span class="chip">${escape(f)}</span>`).join('')}</div>`: ''}
+        </div>`;
+        frag.appendChild(art);
+      });
+      box.appendChild(frag);
+    }
+
+    // Searchers (best effort, public endpoints)
+    async function dsSearchDataGov(q){
+      const url=`https://catalog.data.gov/api/3/action/package_search?rows=50&q=${encodeURIComponent(q)}`;
+      const data=await fetchJSON(url); const hits=data?.result?.results||[];
+      return hits.map(x=>({ title:x.title, description:x.notes, link:`https://catalog.data.gov/dataset/${x.name}`, date:x.metadata_modified, source:'Data.gov', formats:(x.resources||[]).map(r=>r.format).filter(Boolean), files:(x.resources||[]).filter(r=>r.url).map(r=>({label:r.name||r.format||'file', url:r.url})) }));
+    }
+    async function dsSearchSocrata(q){
+      const url=`https://api.us.socrata.com/api/catalog/v1?q=${encodeURIComponent(q)}&only=datasets&limit=50`;
+      const data=await fetchJSON(url); const hits=data?.results||[];
+      return hits.map(x=>{ const r=x.resource||{}, md=x.metadata||{}; const fmts=new Set(); (x.linked_resources||[]).forEach(lr=>{ if(lr.format) fmts.add(lr.format); }); if(r.download_formats) Object.keys(r.download_formats).forEach(k=> fmts.add(k.toUpperCase())); return { title:r.name||md.name, description:r.description||md.description, link:x.permalink||r.permalink||'', date:md.updatedAt||md.createdAt, source:`Socrata: ${r.domain||''}`, formats:[...fmts], files:[] }; });
+    }
+    async function dsSearchZenodo(q){
+      const url=`https://zenodo.org/api/records?q=${encodeURIComponent(q)}&type=dataset&size=50&all_versions=false&sort=mostrecent`;
+      const data=await fetchJSON(url); const hits=data?.hits?.hits||[];
+      return hits.map(x=>{ const files=(x.files||[]).map(f=>({label:f.key||f.filename, url:f.links?.self||f.links?.download})); const fmts=[...new Set(files.map(f=> (f.label.split('.').pop()||'').toUpperCase()))]; return { title:x.metadata?.title, description:x.metadata?.description, link:x.links?.html||x.links?.latest_html, date:x.metadata?.publication_date, source:'Zenodo', formats:fmts, files }; });
+    }
+    async function dsSearchDataGovUK(q){
+      const url=`https://ckan.publishing.service.gov.uk/api/3/action/package_search?rows=50&q=${encodeURIComponent(q)}`;
+      const data=await fetchJSON(url); const hits=data?.result?.results||[];
+      return hits.map(x=>({ title:x.title, description:x.notes, link:`https://ckan.publishing.service.gov.uk/dataset/${x.name}`, date:x.metadata_modified, source:'data.gov.uk', formats:(x.resources||[]).map(r=>r.format).filter(Boolean), files:(x.resources||[]).filter(r=>r.url).map(r=>({label:r.name||r.format||'file', url:r.url})) }));
+    }
+    async function dsSearchEUODP(q){
+      const url=`https://data.europa.eu/api/hub/search/search?query=${encodeURIComponent(q)}&pageSize=50`;
+      const data=await fetchJSON(url); const hits=data?.results||[];
+      return hits.map(x=>{ const d=x.distributions||[]; const files=d.filter(z=>z.downloadURL).map(z=>({label:(z.title?.[0]?.value||z.format||'file'), url:z.downloadURL})); const fmts=[...new Set(d.map(z=>(z.format||'').toUpperCase()))]; return { title:x.title?.[0]?.value||x.title||'Dataset', description:x.description?.[0]?.value||x.description||'', link:x.landingPage||x.landingPageURL||x.id||'', date:x.issued||x.modified||'', source:'EU Open Data', formats:fmts, files }; });
+    }
+    async function dsSearchDataverse(q){
+      const url=`https://dataverse.harvard.edu/api/search?q=${encodeURIComponent(q)}&type=dataset&per_page=50`;
+      const data=await fetchJSON(url); const hits=data?.data?.items||[];
+      return hits.map(x=>({ title:x.name, description:x.description, link:x.url, date:x.published_at||x.updated_at||'', source:'Harvard Dataverse', formats:[], files:[] }));
+    }
+    async function dsSearchFigshare(q){
+      const url=`https://api.figshare.com/v2/articles/search?search_for=${encodeURIComponent(q)}&page_size=50&item_type=dataset`;
+      const data=await fetchJSON(url); const hits=Array.isArray(data)? data:[];
+      return hits.map(x=>{ const files=(x.files||[]).map(f=>({label:f.name||f.supplied_md5||'file', url:f.download_url||f.supplied_url||x.url_public})); const fmts=[...new Set(files.map(f=> (f.label.split('.').pop()||'').toUpperCase()))]; return { title:x.title, description:x.description, link:x.url_public||x.url, date:x.published_date||x.modified_date||'', source:'Figshare', formats:fmts, files }; });
+    }
+    async function dsSearchWorldBank(q){
+      const url=`https://api.worldbank.org/v2/datacatalog?format=json`;
+      const data=await fetchJSON(url); const items=data?.[1]||[]; const qlc=q.toLowerCase();
+      return items.filter(x=> !q || (x.Name?.toLowerCase().includes(qlc) || x.Description?.toLowerCase().includes(qlc))).slice(0,50).map(x=>({ title:x.Name, description:x.Description, link:x.URL||x.AccessURL||'https://datacatalog.worldbank.org/', date:x.LastUpdateDate||'', source:'World Bank (catalog)', formats:[], files:[] }));
+    }
+
+    async function dsRunSearch(){
+      const q=el('#ds-q').value.trim(); const enabled=Object.values(DS.catalogs).filter(c=>c.enabled).map(c=>c.id);
+      if(!q || !enabled.length){ alert('Enter a query and enable at least one source.'); return; }
+      document.getElementById('ds-results').innerHTML='<div class="empty">Searching…</div>';
+      const tasks=[];
+      if(enabled.includes('datagov')) tasks.push(dsSearchDataGov(q).catch(()=>[]));
+      if(enabled.includes('socrata')) tasks.push(dsSearchSocrata(q).catch(()=>[]));
+      if(enabled.includes('zenodo')) tasks.push(dsSearchZenodo(q).catch(()=>[]));
+      if(enabled.includes('datagovuk')) tasks.push(dsSearchDataGovUK(q).catch(()=>[]));
+      if(enabled.includes('euodp')) tasks.push(dsSearchEUODP(q).catch(()=>[]));
+      if(enabled.includes('dataverse')) tasks.push(dsSearchDataverse(q).catch(()=>[]));
+      if(enabled.includes('figshare')) tasks.push(dsSearchFigshare(q).catch(()=>[]));
+      if(enabled.includes('worldbank')) tasks.push(dsSearchWorldBank(q).catch(()=>[]));
+      const parts = await Promise.all(tasks);
+      let merged = parts.flat();
+      // filters
+      const fmt = el('#ds-format').value.trim().toLowerCase();
+      const onlyDirect = !!document.getElementById('ds-only-direct')?.checked;
+      const uaStr = document.getElementById('ds-updated-after')?.value || ''; const uaTs = uaStr ? Date.parse(uaStr) : 0;
+      if(fmt) merged = merged.filter(r => (r.formats||[]).some(f=> (f||'').toLowerCase().includes(fmt)));
+      if(onlyDirect) merged = merged.filter(r => Array.isArray(r.files) && r.files.length>0);
+      if(uaTs) merged = merged.filter(r => normalizeDate(r.date) >= uaTs);
+      // sort newest first
+      merged.sort((a,b)=> normalizeDate(b.date) - normalizeDate(a.date));
+      DS.items = merged; dsRender(merged);
+    }
+
+    document.getElementById('ds-search').addEventListener('click', dsRunSearch);
+    document.getElementById('ds-q').addEventListener('keydown', e=>{ if(e.key==='Enter') dsRunSearch(); });
+    document.getElementById('ds-format').addEventListener('change', ()=> dsRender(DS.items));
+
+    // Quick dataset link scraper
+    async function dsScrapeLinks(url){
+      const html = await fetchProxied(url);
+      const REG=/(href|src)=["']([^"']+\.(?:csv|tsv|json|geojson|xlsx|xls|zip|parquet))(?:[?#][^"']*)?["']/gi;
+      const out=new Map(); let m; while((m=REG.exec(html))){ try{ const abs=new URL(m[2],url).toString(); out.set(abs,abs);}catch{} }
+      return Array.from(out.values()).map(u=>({ title:u.split('/').pop(), description:'Direct file', link:u, date:'', source:'Scraper', formats:[u.split('.').pop().toUpperCase()], files:[{label:u.split('/').pop(), url:u}] }));
+    }
+    document.getElementById('ds-scrape').addEventListener('click', async()=>{
+      const u=el('#ds-scrape-url').value.trim(); if(!u) return alert('Paste a URL');
+      document.getElementById('ds-results').innerHTML='<div class="empty">Scanning…</div>';
+      try{ const items=await dsScrapeLinks(u); DS.items=items; dsRender(items);}catch{ document.getElementById('ds-results').innerHTML='<div class="empty">Could not read that page.</div>'; }
+    });
+
+    // Exports for datasets
+    document.getElementById('ds-download-json').addEventListener('click', ()=> download('datasets.json', JSON.stringify(DS.items||[], null, 2)) );
+    document.getElementById('ds-download-csv').addEventListener('click', ()=> download('datasets.csv', toCSV((DS.items||[]).map(x=>({title:x.title, link:x.link, date:x.date, source:x.source, formats:(x.formats||[]).join('|')})))) );
+
+    // ===================== WEB EXTRACTOR =====================
+    let EX = { url:'', html:'', doc:null, rows:[] };
+
+    function exColRow(def={name:'title', selector:'', attr:'text', regex:'', replace:'', required:false}){
+      const wrap=document.createElement('div'); wrap.className='row'; wrap.style.margin='6px 0';
+      wrap.innerHTML=`
+        <input type="text" class="ex-col-name" placeholder="Column name" value="${def.name||''}" style="flex:1"/>
+        <input type="text" class="ex-col-sel mono" placeholder="Selector (relative)" value="${def.selector||''}" style="flex:1.5"/>
+        <select class="ex-col-attr">
           <option value="text" ${def.attr==='text'?'selected':''}>text</option>
           <option value="href" ${def.attr==='href'?'selected':''}>href</option>
           <option value="src" ${def.attr==='src'?'selected':''}>src</option>
@@ -122,218 +337,68 @@
           <option value="content" ${def.attr==='content'?'selected':''}>content</option>
           <option value="aria-label" ${def.attr==='aria-label'?'selected':''}>aria-label</option>
         </select>
-        <input type="text" class="col-regex mono" placeholder="Regex (optional)" value="${def.regex||''}"/>
-        <input type="text" class="col-repl mono" placeholder="Replace with" value="${def.replace||''}"/>
-        <label class="chip" title="Drop row if this column is empty" style="justify-self:start"><input type="checkbox" class="col-req" ${def.required?'checked':''}/> required</label>
-        <button class="chip col-del" title="Remove column">✖</button>
-      `;
-      wrap.querySelector('.col-del').onclick=()=> wrap.remove();
+        <input type="text" class="ex-col-regex mono" placeholder="Regex (optional)" value="${def.regex||''}" style="flex:1"/>
+        <input type="text" class="ex-col-repl mono" placeholder="Replace with" value="${def.replace||''}" style="flex:1"/>
+        <label class="chip" title="Drop row if this column is empty"><input type="checkbox" class="ex-col-req" ${def.required?'checked':''}/> required</label>
+        <button class="chip ex-col-del" title="Remove">✖</button>`;
+      wrap.querySelector('.ex-col-del').onclick=()=> wrap.remove();
       return wrap;
     }
-    function getCols(){
-      const rows=[...document.querySelectorAll('#cols .col-grid')];
-      return rows.map(r=>({
-        name: r.querySelector('.col-name').value.trim()||'col',
-        selector: r.querySelector('.col-sel').value.trim(),
-        attr: r.querySelector('.col-attr').value,
-        regex: r.querySelector('.col-regex').value,
-        replace: r.querySelector('.col-repl').value,
-        required: r.querySelector('.col-req').checked,
-      }));
-    }
-    function renderCols(list){ const box=el('#cols'); box.innerHTML=''; list.forEach(d=> box.appendChild(colRow(d))); if(!list.length) box.appendChild(colRow()); }
+    function exRenderCols(list){ const box=el('#ex-cols'); box.innerHTML=''; list.forEach(d=> box.appendChild(exColRow(d))); if(!list.length) box.appendChild(exColRow()); }
+    function exGetCols(){ return [...document.querySelectorAll('#ex-cols .row')].map(r=>({ name:r.querySelector('.ex-col-name').value.trim()||'col', selector:r.querySelector('.ex-col-sel').value.trim(), attr:r.querySelector('.ex-col-attr').value, regex:r.querySelector('.ex-col-regex').value, replace:r.querySelector('.ex-col-repl').value, required:r.querySelector('.ex-col-req').checked })); }
 
-    function renderTable(rows){
-      const table = document.getElementById('ex-table');
-      table.innerHTML='';
-      const countEl = document.getElementById('row-count');
-      countEl.textContent = rows.length;
+    function exRenderTable(rows){
+      const table = document.getElementById('ex-table'); table.innerHTML='';
+      el('#ex-row-count').textContent = rows.length;
       if(!rows.length){ table.innerHTML='<tr><td class="empty">No rows</td></tr>'; return; }
-      const cols = Array.from(new Set(rows.flatMap(r=>Object.keys(r))));
-      const thead = `<thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead>`;
-      const tbody = `<tbody>${rows.map(r=>`<tr>${cols.map(c=>`<td>${(r[c]??'').toString().replace(/[&<>]/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[s]))}</td>`).join('')}</tr>`).join('')}</tbody>`;
+      const cols=[...new Set(rows.flatMap(r=>Object.keys(r)))];
+      const thead = `<thead><tr>${cols.map(c=>`<th>${escape(c)}</th>`).join('')}</tr></thead>`;
+      const tbody = `<tbody>${rows.map(r=>`<tr>${cols.map(c=>`<td>${escape(r[c])}</td>`).join('')}</tr>`).join('')}</tbody>`;
       table.innerHTML = thead + tbody;
     }
 
-    async function loadPage(){
-      const url = el('#page-url').value.trim(); if(!url) return alert('Enter a URL');
-      el('#page-meta').textContent='Loading…';
-      const prox=`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-      const r=await fetch(prox); if(!r.ok){ el('#page-meta').textContent='Failed to fetch (CORS/prerender blockers?)'; return; }
-      const {contents=''}=await r.json();
-      PAGE={url, html:contents, doc: parser.parseFromString(contents,'text/html')};
-      const title = PAGE.doc.querySelector('title')?.textContent?.trim()||'(no title)';
-      el('#page-meta').textContent = `Loaded: ${title}`;
-      // clear discovery panes
-      el('#containers').innerHTML=''; el('#fields').innerHTML='';
+    async function exLoad(){
+      const url = el('#ex-page-url').value.trim(); if(!url) return alert('Enter a URL');
+      el('#ex-page-meta').textContent='Loading…';
+      try{
+        const html = await fetchProxied(url);
+        EX = { url, html, doc: new DOMParser().parseFromString(html,'text/html'), rows: [] };
+        const title = EX.doc.querySelector('title')?.textContent?.trim()||'(no title)';
+        el('#ex-page-meta').textContent = `Loaded: ${title}`;
+        el('#ex-containers').innerHTML=''; el('#ex-fields').innerHTML='';
+      }catch(e){ el('#ex-page-meta').textContent='Failed to fetch (CORS/prerender blockers?)'; }
     }
 
-    // ---------- Discovery ----------
-    function nodeSig(n){
-      if(!n || !n.tagName) return '';
-      const tag = n.tagName.toLowerCase();
-      const classes = (n.getAttribute('class')||'').split(/\s+/).filter(Boolean).slice(0,3).join('.');
-      return classes? `${tag}.${classes}`: tag;
-    }
-    function cssOf(n){
-      // Build a short CSS like div.card > h2.title
-      const parts=[]; let cur=n; let depth=0;
-      while(cur && cur.tagName && depth<4){ parts.unshift(nodeSig(cur)); cur=cur.parentElement; depth++; }
-      return parts.join(' > ');
-    }
-    function topRepeatingContainers(doc){
-      // Find candidates that repeat 6+ times and have at least a link/text inside
-      const all = Array.from(doc.querySelectorAll('div, li, article, section, tr'));
-      const map = new Map();
-      all.forEach(n=>{ const sig=nodeSig(n); if(!sig) return; const key=sig; const arr=map.get(key)||[]; arr.push(n); map.set(key,arr); });
-      const candidates = [];
-      map.forEach((nodes, sig)=>{
-        if(nodes.length<6) return;
-        const good = nodes.filter(n=> n.querySelector('a[href], h1, h2, h3, p, time, img'));
-        if(good.length >= 4){ candidates.push({sig, count:nodes.length, nodes}); }
-      });
-      candidates.sort((a,b)=> b.count - a.count);
-      return candidates.slice(0,20);
-    }
-    function fieldSuggestions(containerNodes){
-      // Within containers, suggest typical fields with relative selectors
-      const rels = [
-        {label:'title', sel:'h1, h2, h3, .title, [itemprop="name"]', attr:'text'},
-        {label:'link', sel:'a[href]', attr:'href'},
-        {label:'image', sel:'img', attr:'src'},
-        {label:'date', sel:'time, [datetime]', attr:'datetime'},
-        {label:'price', sel:'[class*="price"], [data-price]', attr:'text'},
-        {label:'rating', sel:'[class*="rating"], [aria-label*="rating"]', attr:'text'},
-        {label:'summary', sel:'p, .summary, .description', attr:'text'}
-      ];
-      // Build preview samples
-      const samples=[];
-      rels.forEach(r=>{
-        const vals = [];
-        containerNodes.slice(0,12).forEach(n=>{
-          const t=n.querySelector(r.sel);
-          if(!t) { vals.push(''); return; }
-          let v='';
-          if(r.attr==='text') v=(t.textContent||'').trim();
-          else v=t.getAttribute(r.attr)||'';
-          vals.push(v);
-        });
-        const nonEmpty = vals.filter(v=>v).length;
-        if(nonEmpty>=3) samples.push({label:r.label, sel:r.sel, attr:r.attr, coverage:nonEmpty, vals});
-      });
-      samples.sort((a,b)=> b.coverage - a.coverage);
-      return samples;
-    }
+    // Discovery helpers
+    function exNodeSig(n){ if(!n||!n.tagName) return ''; const tag=n.tagName.toLowerCase(); const cls=(n.getAttribute('class')||'').split(/\s+/).filter(Boolean).slice(0,3).join('.'); return cls? `${tag}.${cls}`: tag; }
+    function exTopRepeatingContainers(doc){ const all=[...doc.querySelectorAll('div, li, article, section, tr')]; const map=new Map(); all.forEach(n=>{ const sig=exNodeSig(n); if(!sig) return; const arr=map.get(sig)||[]; arr.push(n); map.set(sig,arr);}); const cand=[]; map.forEach((nodes,sig)=>{ if(nodes.length<6) return; const good=nodes.filter(n=> n.querySelector('a[href], h1, h2, h3, p, time, img')); if(good.length>=4) cand.push({sig,count:nodes.length,nodes});}); cand.sort((a,b)=> b.count-a.count); return cand.slice(0,20); }
+    function exFieldSuggestions(nodes){ const rels=[ {label:'title', sel:'h1, h2, h3, .title, [itemprop="name"]', attr:'text'}, {label:'link', sel:'a[href]', attr:'href'}, {label:'image', sel:'img', attr:'src'}, {label:'date', sel:'time, [datetime]', attr:'datetime'}, {label:'price', sel:'[class*="price"], [data-price]', attr:'text'}, {label:'rating', sel:'[class*="rating"], [aria-label*="rating"]', attr:'text'}, {label:'summary', sel:'p, .summary, .description', attr:'text'} ]; const samples=[]; rels.forEach(r=>{ const vals=[]; nodes.slice(0,12).forEach(n=>{ const t=n.querySelector(r.sel); if(!t){ vals.push(''); return; } let v=''; if(r.attr==='text') v=(t.textContent||'').trim(); else v=t.getAttribute(r.attr)||''; vals.push(v);}); const nonEmpty=vals.filter(v=>v).length; if(nonEmpty>=3) samples.push({label:r.label,sel:r.sel,attr:r.attr,coverage:nonEmpty,vals});}); samples.sort((a,b)=> b.coverage-a.coverage); return samples; }
 
-    function renderContainers(cands){
-      const box=el('#containers'); box.innerHTML='';
-      if(!cands.length){ box.innerHTML='<div class="empty">Nothing obvious found. Try clicking Load again or a different page.</div>'; return; }
-      cands.forEach(c=>{
-        const btn=document.createElement('button'); btn.className='chip';
-        btn.innerHTML = `<strong>${c.sig}</strong> <span class="mono">(${c.count})</span>`;
-        btn.onclick=()=>{
-          el('#container-sel').value = c.sig; // use sig as container selector
-          const fields = fieldSuggestions(c.nodes);
-          renderFields(fields);
-        };
-        box.appendChild(btn);
-      });
-    }
-    function renderFields(list){
-      const box=el('#fields'); box.innerHTML='';
-      if(!list.length){ box.innerHTML='<div class="empty">No obvious fields inside that container. Try another.</div>'; return; }
-      list.forEach(f=>{
-        const card=document.createElement('div'); card.className='card';
-        const c=document.createElement('div'); c.className='content';
-        c.innerHTML = `<div><strong>${f.label}</strong> <span class="mono">(${f.attr})</span></div>
-          <div class="small mono" style="opacity:.85;margin:6px 0">${f.sel}</div>
-          <div class="small" style="opacity:.85">Samples:</div>
-          <div class="mono small" style="white-space:pre-wrap; word-break:break-word; max-height:110px; overflow:auto">${f.vals.slice(0,6).map(v=> (v||'').toString().slice(0,140)).join('\n')}</div>
-          <div class="row" style="margin-top:8px"><button class="chip">Add as column</button></div>`;
-        const addBtn = c.querySelector('button');
-        addBtn.onclick=()=>{
-          // Add a column row with relative selector
-          document.getElementById('cols').appendChild(colRow({name:f.label, selector:f.sel, attr:f.attr}));
-        };
-        card.appendChild(c); box.appendChild(card);
-      });
-    }
+    function exRenderContainers(cands){ const box=el('#ex-containers'); box.innerHTML=''; if(!cands.length){ box.innerHTML='<div class="empty">Nothing obvious found. Try a different page.</div>'; return; } cands.forEach(c=>{ const btn=document.createElement('button'); btn.className='chip'; btn.innerHTML=`<strong>${escape(c.sig)}</strong> <span class="mono">(${c.count})</span>`; btn.onclick=()=>{ el('#ex-container-sel').value=c.sig; const fields=exFieldSuggestions(c.nodes); exRenderFields(fields); }; box.appendChild(btn); }); }
+    function exRenderFields(list){ const box=el('#ex-fields'); box.innerHTML=''; if(!list.length){ box.innerHTML='<div class="empty">No obvious fields inside that container.</div>'; return; } list.forEach(f=>{ const card=document.createElement('div'); card.className='card'; const c=document.createElement('div'); c.className='content'; c.innerHTML = `<div><strong>${escape(f.label)}</strong> <span class="mono">(${escape(f.attr)})</span></div><div class="small mono" style="opacity:.85;margin:6px 0">${escape(f.sel)}</div><div class="small" style="opacity:.85">Samples:</div><div class="mono small" style="white-space:pre-wrap;word-break:break-word;max-height:110px;overflow:auto">${f.vals.slice(0,6).map(v=> escape((v||'').toString().slice(0,140))).join('\n')}</div><div class="row" style="margin-top:8px"><button class="chip">Add as column</button></div>`; const addBtn=c.querySelector('button'); addBtn.onclick=()=>{ document.getElementById('ex-cols').appendChild(exColRow({name:f.label, selector:f.sel, attr:f.attr})); }; card.appendChild(c); box.appendChild(card); }); }
 
-    async function discover(){
-      if(!PAGE.doc){ alert('Load a page first'); return; }
-      el('#containers').innerHTML='<div class="empty">Scanning…</div>';
-      el('#fields').innerHTML='';
-      // Generate container candidates
-      const cands = topRepeatingContainers(PAGE.doc);
-      renderContainers(cands);
-      // If we found any, auto-select the top one to show field suggestions
-      if(cands.length){ const fields = fieldSuggestions(cands[0].nodes); renderFields(fields); }
-    }
+    async function exDiscover(){ if(!EX.doc){ alert('Load a page first'); return; } el('#ex-containers').innerHTML='<div class="empty">Scanning…</div>'; el('#ex-fields').innerHTML=''; const cands=exTopRepeatingContainers(EX.doc); exRenderContainers(cands); if(cands.length){ const fields=exFieldSuggestions(cands[0].nodes); exRenderFields(fields); } }
 
-    function applyRegex(str, rx, repl){ if(!rx) return str; try{ const r=new RegExp(rx,'g'); return (str??'').toString().replace(r, repl??''); }catch{ return str; } }
-    function getText(n){ return (n?.textContent||'').trim(); }
-    function getAttr(n,a){ return n?.getAttribute(a); }
+    function exApplyRegex(str, rx, repl){ if(!rx) return str; try{ const r=new RegExp(rx,'g'); return (str??'').toString().replace(r, repl??''); }catch{ return str; } }
+    function exGetText(n){ return (n?.textContent||'').trim(); }
+    function exGetAttr(n,a){ return n?.getAttribute(a); }
 
-    function extractColumns(){
-      if(!PAGE.doc){ alert('Load a page first'); return []; }
-      const abs = el('#absolute').checked;
-      const containerSel = el('#container-sel').value.trim();
-      const columns = getCols();
-      let nodes = [];
-      if(containerSel){ nodes = Array.from(PAGE.doc.querySelectorAll(containerSel)); }
-      else {
-        const first = columns.find(c=>c.selector); if(!first){ alert('Add at least one column with a selector'); return []; }
-        nodes = Array.from(PAGE.doc.querySelectorAll(first.selector));
-      }
-      const rows=[];
-      nodes.forEach(n=>{
-        const row={}; let drop=false;
-        columns.forEach(c=>{
-          let target=n;
-          if(containerSel && c.selector){ target=n.querySelector(c.selector); }
-          else if(!containerSel && c.selector){ target=(c===columns[0])? n : PAGE.doc.querySelector(c.selector); }
-          let val='';
-          if(target){
-            if(c.attr==='text') val=getText(target);
-            else if(c.attr==='href' || c.attr==='src'){
-              const raw=getAttr(target,c.attr); val = abs? toAbs(raw, PAGE.url): raw;
-            } else { val=getAttr(target,c.attr); }
-            val = applyRegex(val, c.regex, c.replace);
-          }
-          if(c.required && !val) drop=true;
-          row[c.name]=val??'';
-        });
-        if(!drop) rows.push(row);
-      });
-      if(el('#dedupe').checked){ const seen=new Set(); return rows.filter(r=>{ const k=JSON.stringify(r); if(seen.has(k)) return false; seen.add(k); return true;}); }
-      return rows;
-    }
+    function exExtract(){ if(!EX.doc){ alert('Load a page first'); return []; } const abs=el('#ex-absolute').checked; const containerSel=el('#ex-container-sel').value.trim(); const cols=exGetCols(); let nodes=[]; if(containerSel){ nodes=[...EX.doc.querySelectorAll(containerSel)]; } else { const first=cols.find(c=>c.selector); if(!first){ alert('Add at least one column with a selector'); return []; } nodes=[...EX.doc.querySelectorAll(first.selector)]; } const rows=[]; nodes.forEach(n=>{ const row={}; let drop=false; cols.forEach(c=>{ let target=n; if(containerSel && c.selector) target = n.querySelector(c.selector); else if(!containerSel && c.selector) target = (c===cols[0]) ? n : EX.doc.querySelector(c.selector); let val=''; if(target){ if(c.attr==='text') val=exGetText(target); else if(c.attr==='href'||c.attr==='src'){ const raw=exGetAttr(target,c.attr); val = abs? toAbs(raw, EX.url): raw; } else { val=exGetAttr(target,c.attr); } val = exApplyRegex(val, c.regex, c.replace); } if(c.required && !val) drop=true; row[c.name]=val??''; }); if(!drop) rows.push(row); }); if(el('#ex-dedupe').checked){ const seen=new Set(); EX.rows = rows.filter(r=>{ const k=JSON.stringify(r); if(seen.has(k)) return false; seen.add(k); return true; }); } else EX.rows = rows; exRenderTable(EX.rows); }
 
-    function runAndRender(){ const rows = extractColumns(); renderTable(rows); window._rows = rows; }
+    function exPresetIMDB(){ el('#ex-container-sel').value='table tbody tr, .lister-list .lister-item, .ipc-metadata-list-summary-item'; exRenderCols([{name:'title', selector:'.titleColumn a, .lister-item-header a, .ipc-title-link-wrapper', attr:'text', required:true}, {name:'url', selector:'.titleColumn a, .lister-item-header a, a.ipc-title-link-wrapper', attr:'href', required:true}, {name:'year', selector:'.secondaryInfo, .lister-item-year, .cli-title-metadata-item:nth-child(1)', attr:'text', regex:'[^0-9]', replace:''}, {name:'rating', selector:'.imdbRating strong, .ratings-imdb-rating strong, [aria-label*="rating"]', attr:'text'}]); }
 
-    // Preset for IMDb-like list pages
-    function presetIMDB(){
-      el('#container-sel').value='table tbody tr, .lister-list .lister-item, .ipc-metadata-list-summary-item';
-      renderCols([
-        {name:'title', selector:'.titleColumn a, .lister-item-header a, .ipc-title-link-wrapper', attr:'text', required:true},
-        {name:'url', selector:'.titleColumn a, .lister-item-header a, a.ipc-title-link-wrapper', attr:'href', required:true},
-        {name:'year', selector:'.secondaryInfo, .lister-item-year, .cli-title-metadata-item:nth-child(1)', attr:'text', regex:'[^0-9]', replace:''},
-        {name:'rating', selector:'.imdbRating strong, .ratings-imdb-rating strong, [aria-label*="rating"]', attr:'text'}
-      ]);
-    }
+    // Bind extractor UI
+    document.getElementById('ex-load').addEventListener('click', exLoad);
+    document.getElementById('ex-discover').addEventListener('click', exDiscover);
+    document.getElementById('ex-add-col').addEventListener('click', ()=> document.getElementById('ex-cols').appendChild(exColRow({name:'col'})) );
+    document.getElementById('ex-clear-cols').addEventListener('click', ()=> exRenderCols([]));
+    document.getElementById('ex-extract').addEventListener('click', exExtract);
+    document.getElementById('ex-preset-imdb').addEventListener('click', exPresetIMDB);
+    document.getElementById('ex-download-json').addEventListener('click', ()=> download('extracted.json', JSON.stringify(EX.rows||[],null,2)) );
+    document.getElementById('ex-download-csv').addEventListener('click', ()=> download('extracted.csv', toCSV(EX.rows||[])) );
 
-    // Bind UI
-    document.getElementById('load-page').addEventListener('click', loadPage);
-    document.getElementById('discover').addEventListener('click', discover);
-    document.getElementById('add-col').addEventListener('click', ()=> document.getElementById('cols').appendChild(colRow({name:'col'})) );
-    document.getElementById('clear-cols').addEventListener('click', ()=> renderCols([]));
-    document.getElementById('extract').addEventListener('click', runAndRender);
-    document.getElementById('preset-imdb').addEventListener('click', presetIMDB);
-    document.getElementById('download-json').addEventListener('click', ()=> download('extracted.json', JSON.stringify(window._rows||[],null,2)));
-    document.getElementById('download-csv').addEventListener('click', ()=> download('extracted.csv', toCSV(window._rows||[])));
-
-    // init
-    renderCols([]);
+    // init extractor columns
+    exRenderCols([]);
   </script>
 </body>
 </html>
