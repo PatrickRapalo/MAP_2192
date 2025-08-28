@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Dataset & Web Extractor — Column Builder</title>
+  <title>Dataset & Web Extractor — Column Builder + Discovery</title>
   <style>
     :root{--bg:#0b1020;--panel:#12182b;--text:#e7ecff;--muted:#a9b7ffcc;--chip:#1b2340;--card:#0f1527}
     *{box-sizing:border-box}
@@ -11,19 +11,15 @@
     header{position:sticky;top:0;z-index:5;background:linear-gradient(180deg,rgba(7,10,20,.95),rgba(7,10,20,.75));backdrop-filter:blur(6px);border-bottom:1px solid #1f2746}
     .container{max-width:1200px;margin:0 auto;padding:18px}
     h1{font-size:1.35rem;margin:0 0 10px}
-    .tabs{display:flex;gap:10px;flex-wrap:wrap}
-    .tab{padding:8px 12px;border:1px solid #23315f;border-radius:999px;background:#0a0f21;color:var(--text);cursor:pointer}
-    .tab.active{background:linear-gradient(180deg,#2a3c7d,#24356d);border-color:#2d3f80}
     .panel{background:var(--panel);border:1px solid #20294a;border-radius:14px;padding:12px}
-    .grid{display:grid;gap:14px}
-    @media(min-width:1000px){.grid-2{grid-template-columns:2fr 1fr}}
     .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
     input,select,button,textarea{padding:10px 12px;border-radius:10px;border:1px solid #223160;background:#0a0f21;color:var(--text)}
     button{cursor:pointer}
     button.primary{background:linear-gradient(180deg,#2a3c7d,#24356d);border-color:#2d3f80}
     .chips{display:flex;gap:8px;flex-wrap:wrap}
     .chip{display:inline-flex;align-items:center;gap:6px;padding:8px 10px;border-radius:999px;background:var(--chip);border:1px solid #23315f;font-size:.92rem}
-    .hint{color:var(--muted);font-size:.9rem}
+    .grid{display:grid;gap:14px}
+    @media(min-width:1100px){.grid-3{grid-template-columns:2fr 1.6fr 1.4fr}}
     .card{background:var(--card);border:1px solid #1c2546;border-radius:16px;overflow:hidden}
     .content{padding:12px}
     .table{width:100%;border-collapse:collapse}
@@ -32,110 +28,78 @@
     .hidden{display:none!important}
     .scroll{max-height:60vh;overflow:auto;-webkit-overflow-scrolling:touch}
     .small{font-size:.9rem}
-    .col-grid{display:grid;grid-template-columns:1.4fr 0.8fr 1fr 1fr auto;gap:8px;align-items:center}
-    .col-grid input[type="text"]{width:100%}
-    .kv{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .col-grid{display:grid;grid-template-columns:1.2fr 1fr 0.9fr 1fr 1fr auto;gap:8px;align-items:center}
+    .col-grid input[type="text"], .col-grid select{width:100%}
+    .mono{font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace; font-size:.85rem}
   </style>
 </head>
 <body>
   <header>
     <div class="container">
-      <h1>Dataset & Web Extractor — Column Builder</h1>
-      <div class="tabs">
-        <button class="tab active" data-tab="extract">Extract From Web Page</button>
-        <button class="tab" data-tab="datasets">Find Datasets</button>
-      </div>
+      <h1>Dataset & Web Extractor — Column Builder + Discovery</h1>
     </div>
   </header>
 
   <main class="container">
-    <!-- WEB EXTRACTOR (with column builder) -->
-    <section id="tab-extract">
-      <div class="grid grid-2">
-        <div class="panel">
-          <div class="hint">Load a public page, then define columns you want to extract. Each column = CSS selector + attribute + optional regex cleanup.</div>
+    <div class="panel">
+      <div class="row" style="align-items:flex-start;justify-content:space-between">
+        <div style="flex:2 1 520px">
+          <div class="hint">Load a public page, then either <strong>discover</strong> likely containers/fields or manually build columns.</div>
           <div class="row" style="margin-top:8px">
-            <input id="page-url" type="url" placeholder="https://example.com/articles" style="flex:1"/>
+            <input id="page-url" type="url" placeholder="https://example.com/list-or-article" style="flex:1"/>
             <button id="load-page" class="primary">Load</button>
+            <button id="discover" title="Analyze the page for repeating containers & fields">Discover</button>
           </div>
-          <div id="page-meta" class="small" style="margin-top:8px;color:var(--muted)"></div>
-
-          <h3 style="margin:14px 0 6px">Column builder</h3>
-          <div class="row small"><span class="hint">Tip: use the same container selector across columns to align rows (e.g., ".card").
-            Set per-column selectors relative to each container (e.g., ".title a").</span></div>
-
-          <div class="row" style="margin:6px 0">
-            <input id="container-sel" placeholder="Container CSS (optional, e.g., .card)" style="flex:1"/>
-            <button id="add-col" class="chip">+ Add column</button>
-            <button id="clear-cols" class="chip">Clear</button>
-            <div class="hint">Rows: <span id="ex-count">0</span></div>
-          </div>
-
-          <div id="cols" class="scroll"></div>
-
-          <div class="row" style="justify-content:space-between;align-items:center;margin-top:8px">
-            <div class="row" style="gap:8px">
-              <label class="chip"><input type="checkbox" id="dedupe" checked/> deduplicate rows</label>
-              <label class="chip"><input type="checkbox" id="absolute" checked/> make links absolute</label>
-            </div>
-            <div class="row" style="gap:8px">
-              <button id="preset-blog" title="Title/URL/Date from typical article cards">Preset: Blog list</button>
-              <button id="preset-table" title="Extract first table as columns">Preset: Table</button>
-              <button id="run-cols" class="primary">Extract</button>
-            </div>
-          </div>
+          <div id="page-meta" class="small" style="margin-top:6px;color:var(--muted)"></div>
         </div>
-
-        <div class="panel">
-          <div class="row" style="justify-content:space-between;align-items:center">
-            <div class="hint">Preview (<span id="row-count">0</span> rows)</div>
-            <div class="row" style="gap:8px">
-              <button id="download-json">Download JSON</button>
-              <button id="download-csv">Download CSV</button>
-            </div>
-          </div>
-          <div class="scroll">
-            <table class="table" id="ex-table"></table>
-          </div>
+        <div class="row" style="flex:1 1 340px; justify-content:flex-end">
+          <label class="chip"><input type="checkbox" id="dedupe" checked/> deduplicate rows</label>
+          <label class="chip"><input type="checkbox" id="absolute" checked/> make links absolute</label>
+          <button id="extract" class="primary">Extract</button>
         </div>
       </div>
-    </section>
+    </div>
 
-    <!-- DATASET FINDER (lite) -->
-    <section id="tab-datasets" class="hidden">
-      <div class="panel">
-        <div class="hint">Quick dataset search across a few catalogs. For the full-featured finder you already have, keep using your other file.</div>
-        <div class="row" style="margin-top:8px">
-          <input id="q" style="flex:1" placeholder="e.g., traffic collisions, climate anomalies"/>
-          <select id="format">
-            <option value="">Any format</option>
-            <option value="csv">CSV</option>
-            <option value="json">JSON</option>
-            <option value="geojson">GeoJSON</option>
-            <option value="xlsx">XLSX/XLS</option>
-            <option value="zip">ZIP</option>
-            <option value="parquet">Parquet</option>
-          </select>
-          <button id="search" class="primary">Search</button>
+    <div class="grid grid-3" style="margin-top:12px">
+      <!-- Column Builder -->
+      <section class="panel">
+        <div class="row" style="margin-bottom:6px;align-items:center">
+          <strong>Column Builder</strong>
+          <input id="container-sel" placeholder="Container CSS (optional, e.g., .card, article, table tbody tr)" style="flex:1"/>
+          <button id="add-col" class="chip">+ Add column</button>
+          <button id="clear-cols" class="chip">Clear</button>
+          <button id="preset-imdb" title="title/url/year/rating for common IMDb lists">Preset: IMDb</button>
         </div>
-        <div id="source-chips" class="chips" style="margin-top:8px"></div>
-        <div id="results" class="grid" style="margin-top:10px"></div>
-        <div id="empty" class="empty hidden">No results yet.</div>
+        <div id="cols" class="scroll"></div>
+      </section>
+
+      <!-- Discovery: Containers & Fields -->
+      <section class="panel">
+        <strong>Discover Containers</strong>
+        <div id="containers" class="scroll" style="margin-top:6px"></div>
+      </section>
+
+      <section class="panel">
+        <strong>Field Suggestions</strong>
+        <div id="fields" class="scroll" style="margin-top:6px"></div>
+      </section>
+    </div>
+
+    <section class="panel" style="margin-top:12px">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <div class="hint">Preview (<span id="row-count">0</span> rows)</div>
+        <div class="row" style="gap:8px">
+          <button id="download-json">Download JSON</button>
+          <button id="download-csv">Download CSV</button>
+        </div>
+      </div>
+      <div class="scroll">
+        <table class="table" id="ex-table"></table>
       </div>
     </section>
   </main>
 
   <script>
-    // ------ tab switch
-    const tabs = document.querySelectorAll('.tab');
-    tabs.forEach(t=> t.addEventListener('click', ()=>{
-      tabs.forEach(x=>x.classList.remove('active'));
-      t.classList.add('active');
-      document.getElementById('tab-extract').classList.toggle('hidden', t.dataset.tab!=='extract');
-      document.getElementById('tab-datasets').classList.toggle('hidden', t.dataset.tab!=='datasets');
-    }));
-
-    // ===================== WEB EXTRACTOR with COLUMN BUILDER =====================
     let PAGE = { url:'', html:'', doc:null };
     const parser = new DOMParser();
     const el = s=>document.querySelector(s);
@@ -144,12 +108,11 @@
     function download(filename, text){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([text],{type:'application/octet-stream'})); a.download=filename; a.click(); }
     function toCSV(rows){ if(!rows.length) return ''; const cols=[...new Set(rows.flatMap(r=>Object.keys(r)))]; const esc=v=>(''+(v??'')).replace(/"/g,'""'); return [cols.join(','), ...rows.map(r=> cols.map(c=>`"${esc(r[c])}"`).join(','))].join('\n'); }
 
-    // dynamic column UI
     function colRow(def={name:'title', selector:'', attr:'text', regex:'', replace:'', required:false}){
       const wrap=document.createElement('div'); wrap.className='col-grid'; wrap.style.margin='6px 0';
       wrap.innerHTML = `
         <input type="text" class="col-name" placeholder="Column name" value="${def.name||''}"/>
-        <input type="text" class="col-sel" placeholder="Selector (relative)" value="${def.selector||''}"/>
+        <input type="text" class="col-sel mono" placeholder="Selector (relative)" value="${def.selector||''}"/>
         <select class="col-attr">
           <option value="text" ${def.attr==='text'?'selected':''}>text</option>
           <option value="href" ${def.attr==='href'?'selected':''}>href</option>
@@ -159,15 +122,14 @@
           <option value="content" ${def.attr==='content'?'selected':''}>content</option>
           <option value="aria-label" ${def.attr==='aria-label'?'selected':''}>aria-label</option>
         </select>
-        <input type="text" class="col-regex" placeholder="Regex (optional)" value="${def.regex||''}"/>
-        <input type="text" class="col-repl" placeholder="Replace with" value="${def.replace||''}"/>
+        <input type="text" class="col-regex mono" placeholder="Regex (optional)" value="${def.regex||''}"/>
+        <input type="text" class="col-repl mono" placeholder="Replace with" value="${def.replace||''}"/>
         <label class="chip" title="Drop row if this column is empty" style="justify-self:start"><input type="checkbox" class="col-req" ${def.required?'checked':''}/> required</label>
         <button class="chip col-del" title="Remove column">✖</button>
       `;
       wrap.querySelector('.col-del').onclick=()=> wrap.remove();
       return wrap;
     }
-
     function getCols(){
       const rows=[...document.querySelectorAll('#cols .col-grid')];
       return rows.map(r=>({
@@ -179,12 +141,7 @@
         required: r.querySelector('.col-req').checked,
       }));
     }
-
-    function renderCols(list){
-      const box=el('#cols'); box.innerHTML='';
-      list.forEach(d=> box.appendChild(colRow(d)));
-      if(!list.length) box.appendChild(colRow());
-    }
+    function renderCols(list){ const box=el('#cols'); box.innerHTML=''; list.forEach(d=> box.appendChild(colRow(d))); if(!list.length) box.appendChild(colRow()); }
 
     function renderTable(rows){
       const table = document.getElementById('ex-table');
@@ -207,15 +164,115 @@
       PAGE={url, html:contents, doc: parser.parseFromString(contents,'text/html')};
       const title = PAGE.doc.querySelector('title')?.textContent?.trim()||'(no title)';
       el('#page-meta').textContent = `Loaded: ${title}`;
+      // clear discovery panes
+      el('#containers').innerHTML=''; el('#fields').innerHTML='';
     }
 
-    function getText(n){ return (n.textContent||'').trim(); }
-    function getAttr(n,attr){ return n.getAttribute(attr); }
-
-    function applyRegex(str, rx, repl){
-      if(!rx) return str;
-      try{ const r=new RegExp(rx,'g'); return (str??'').toString().replace(r, repl??''); }catch{ return str; }
+    // ---------- Discovery ----------
+    function nodeSig(n){
+      if(!n || !n.tagName) return '';
+      const tag = n.tagName.toLowerCase();
+      const classes = (n.getAttribute('class')||'').split(/\s+/).filter(Boolean).slice(0,3).join('.');
+      return classes? `${tag}.${classes}`: tag;
     }
+    function cssOf(n){
+      // Build a short CSS like div.card > h2.title
+      const parts=[]; let cur=n; let depth=0;
+      while(cur && cur.tagName && depth<4){ parts.unshift(nodeSig(cur)); cur=cur.parentElement; depth++; }
+      return parts.join(' > ');
+    }
+    function topRepeatingContainers(doc){
+      // Find candidates that repeat 6+ times and have at least a link/text inside
+      const all = Array.from(doc.querySelectorAll('div, li, article, section, tr'));
+      const map = new Map();
+      all.forEach(n=>{ const sig=nodeSig(n); if(!sig) return; const key=sig; const arr=map.get(key)||[]; arr.push(n); map.set(key,arr); });
+      const candidates = [];
+      map.forEach((nodes, sig)=>{
+        if(nodes.length<6) return;
+        const good = nodes.filter(n=> n.querySelector('a[href], h1, h2, h3, p, time, img'));
+        if(good.length >= 4){ candidates.push({sig, count:nodes.length, nodes}); }
+      });
+      candidates.sort((a,b)=> b.count - a.count);
+      return candidates.slice(0,20);
+    }
+    function fieldSuggestions(containerNodes){
+      // Within containers, suggest typical fields with relative selectors
+      const rels = [
+        {label:'title', sel:'h1, h2, h3, .title, [itemprop="name"]', attr:'text'},
+        {label:'link', sel:'a[href]', attr:'href'},
+        {label:'image', sel:'img', attr:'src'},
+        {label:'date', sel:'time, [datetime]', attr:'datetime'},
+        {label:'price', sel:'[class*="price"], [data-price]', attr:'text'},
+        {label:'rating', sel:'[class*="rating"], [aria-label*="rating"]', attr:'text'},
+        {label:'summary', sel:'p, .summary, .description', attr:'text'}
+      ];
+      // Build preview samples
+      const samples=[];
+      rels.forEach(r=>{
+        const vals = [];
+        containerNodes.slice(0,12).forEach(n=>{
+          const t=n.querySelector(r.sel);
+          if(!t) { vals.push(''); return; }
+          let v='';
+          if(r.attr==='text') v=(t.textContent||'').trim();
+          else v=t.getAttribute(r.attr)||'';
+          vals.push(v);
+        });
+        const nonEmpty = vals.filter(v=>v).length;
+        if(nonEmpty>=3) samples.push({label:r.label, sel:r.sel, attr:r.attr, coverage:nonEmpty, vals});
+      });
+      samples.sort((a,b)=> b.coverage - a.coverage);
+      return samples;
+    }
+
+    function renderContainers(cands){
+      const box=el('#containers'); box.innerHTML='';
+      if(!cands.length){ box.innerHTML='<div class="empty">Nothing obvious found. Try clicking Load again or a different page.</div>'; return; }
+      cands.forEach(c=>{
+        const btn=document.createElement('button'); btn.className='chip';
+        btn.innerHTML = `<strong>${c.sig}</strong> <span class="mono">(${c.count})</span>`;
+        btn.onclick=()=>{
+          el('#container-sel').value = c.sig; // use sig as container selector
+          const fields = fieldSuggestions(c.nodes);
+          renderFields(fields);
+        };
+        box.appendChild(btn);
+      });
+    }
+    function renderFields(list){
+      const box=el('#fields'); box.innerHTML='';
+      if(!list.length){ box.innerHTML='<div class="empty">No obvious fields inside that container. Try another.</div>'; return; }
+      list.forEach(f=>{
+        const card=document.createElement('div'); card.className='card';
+        const c=document.createElement('div'); c.className='content';
+        c.innerHTML = `<div><strong>${f.label}</strong> <span class="mono">(${f.attr})</span></div>
+          <div class="small mono" style="opacity:.85;margin:6px 0">${f.sel}</div>
+          <div class="small" style="opacity:.85">Samples:</div>
+          <div class="mono small" style="white-space:pre-wrap; word-break:break-word; max-height:110px; overflow:auto">${f.vals.slice(0,6).map(v=> (v||'').toString().slice(0,140)).join('\n')}</div>
+          <div class="row" style="margin-top:8px"><button class="chip">Add as column</button></div>`;
+        const addBtn = c.querySelector('button');
+        addBtn.onclick=()=>{
+          // Add a column row with relative selector
+          document.getElementById('cols').appendChild(colRow({name:f.label, selector:f.sel, attr:f.attr}));
+        };
+        card.appendChild(c); box.appendChild(card);
+      });
+    }
+
+    async function discover(){
+      if(!PAGE.doc){ alert('Load a page first'); return; }
+      el('#containers').innerHTML='<div class="empty">Scanning…</div>';
+      el('#fields').innerHTML='';
+      // Generate container candidates
+      const cands = topRepeatingContainers(PAGE.doc);
+      renderContainers(cands);
+      // If we found any, auto-select the top one to show field suggestions
+      if(cands.length){ const fields = fieldSuggestions(cands[0].nodes); renderFields(fields); }
+    }
+
+    function applyRegex(str, rx, repl){ if(!rx) return str; try{ const r=new RegExp(rx,'g'); return (str??'').toString().replace(r, repl??''); }catch{ return str; } }
+    function getText(n){ return (n?.textContent||'').trim(); }
+    function getAttr(n,a){ return n?.getAttribute(a); }
 
     function extractColumns(){
       if(!PAGE.doc){ alert('Load a page first'); return []; }
@@ -225,120 +282,58 @@
       let nodes = [];
       if(containerSel){ nodes = Array.from(PAGE.doc.querySelectorAll(containerSel)); }
       else {
-        // If no container, derive from the first non-empty selector
-        const first = columns.find(c=>c.selector);
-        if(!first){ alert('Add at least one column with a selector'); return []; }
+        const first = columns.find(c=>c.selector); if(!first){ alert('Add at least one column with a selector'); return []; }
         nodes = Array.from(PAGE.doc.querySelectorAll(first.selector));
       }
-
-      const rows = [];
-      nodes.forEach(n => {
-        const row = {};
-        let drop = false;
-        columns.forEach(c => {
-          let target = n;
-          if(containerSel && c.selector){ target = n.querySelector(c.selector); }
-          else if(!containerSel && c.selector){ target = (c===columns[0]) ? n : n.closest('html').querySelector(c.selector); }
-          let val = '';
+      const rows=[];
+      nodes.forEach(n=>{
+        const row={}; let drop=false;
+        columns.forEach(c=>{
+          let target=n;
+          if(containerSel && c.selector){ target=n.querySelector(c.selector); }
+          else if(!containerSel && c.selector){ target=(c===columns[0])? n : PAGE.doc.querySelector(c.selector); }
+          let val='';
           if(target){
-            if(c.attr==='text') val = getText(target);
+            if(c.attr==='text') val=getText(target);
             else if(c.attr==='href' || c.attr==='src'){
-              const raw = getAttr(target, c.attr);
-              val = abs ? toAbs(raw, PAGE.url) : raw;
-            } else {
-              val = getAttr(target, c.attr);
-            }
+              const raw=getAttr(target,c.attr); val = abs? toAbs(raw, PAGE.url): raw;
+            } else { val=getAttr(target,c.attr); }
             val = applyRegex(val, c.regex, c.replace);
           }
-          if(c.required && !val) drop = true;
-          row[c.name] = val??'';
+          if(c.required && !val) drop=true;
+          row[c.name]=val??'';
         });
         if(!drop) rows.push(row);
       });
-
-      if(el('#dedupe').checked){
-        const seen=new Set();
-        return rows.filter(r=>{ const k=JSON.stringify(r); if(seen.has(k)) return false; seen.add(k); return true; });
-      }
+      if(el('#dedupe').checked){ const seen=new Set(); return rows.filter(r=>{ const k=JSON.stringify(r); if(seen.has(k)) return false; seen.add(k); return true;}); }
       return rows;
-    }
-
-    // presets
-    function presetBlog(){
-      el('#container-sel').value = '.card, article, .post';
-      renderCols([
-        {name:'title', selector:'.title, h2, h3 a', attr:'text'},
-        {name:'url', selector:'a', attr:'href', required:true},
-        {name:'date', selector:'time', attr:'datetime', regex:'T.*$', replace:''}
-      ]);
-    }
-    function presetTable(){
-      // Convert first table to column builder based on header cells
-      if(!PAGE.doc){ alert('Load a page first'); return; }
-      const t = PAGE.doc.querySelector('table');
-      if(!t){ alert('No table found'); return; }
-      el('#container-sel').value = 'table tbody tr, table tr';
-      const headers = Array.from(t.querySelectorAll('thead th')).map(th=> th.textContent.trim())
-        || Array.from(t.querySelectorAll('tr:first-child th, tr:first-child td')).map(td=> td.textContent.trim());
-      const defs = (headers.length? headers: ['col_1','col_2','col_3']).map((h,i)=>({name: h||`col_${i+1}`, selector:`td:nth-child(${i+1}), th:nth-child(${i+1})`, attr:'text'}));
-      renderCols(defs);
     }
 
     function runAndRender(){ const rows = extractColumns(); renderTable(rows); window._rows = rows; }
 
-    // bind
-    document.getElementById('load-page').addEventListener('click', loadPage);
-    document.getElementById('add-col').addEventListener('click', ()=>{
-      document.getElementById('cols').appendChild(colRow({name:'col'}));
-    });
-    document.getElementById('clear-cols').addEventListener('click', ()=> renderCols([]));
-    document.getElementById('run-cols').addEventListener('click', runAndRender);
-    document.getElementById('preset-blog').addEventListener('click', presetBlog);
-    document.getElementById('preset-table').addEventListener('click', presetTable);
+    // Preset for IMDb-like list pages
+    function presetIMDB(){
+      el('#container-sel').value='table tbody tr, .lister-list .lister-item, .ipc-metadata-list-summary-item';
+      renderCols([
+        {name:'title', selector:'.titleColumn a, .lister-item-header a, .ipc-title-link-wrapper', attr:'text', required:true},
+        {name:'url', selector:'.titleColumn a, .lister-item-header a, a.ipc-title-link-wrapper', attr:'href', required:true},
+        {name:'year', selector:'.secondaryInfo, .lister-item-year, .cli-title-metadata-item:nth-child(1)', attr:'text', regex:'[^0-9]', replace:''},
+        {name:'rating', selector:'.imdbRating strong, .ratings-imdb-rating strong, [aria-label*="rating"]', attr:'text'}
+      ]);
+    }
 
+    // Bind UI
+    document.getElementById('load-page').addEventListener('click', loadPage);
+    document.getElementById('discover').addEventListener('click', discover);
+    document.getElementById('add-col').addEventListener('click', ()=> document.getElementById('cols').appendChild(colRow({name:'col'})) );
+    document.getElementById('clear-cols').addEventListener('click', ()=> renderCols([]));
+    document.getElementById('extract').addEventListener('click', runAndRender);
+    document.getElementById('preset-imdb').addEventListener('click', presetIMDB);
     document.getElementById('download-json').addEventListener('click', ()=> download('extracted.json', JSON.stringify(window._rows||[],null,2)));
     document.getElementById('download-csv').addEventListener('click', ()=> download('extracted.csv', toCSV(window._rows||[])));
 
-    // init columns
+    // init
     renderCols([]);
-
-    // ===================== (Lite) DATASET FINDER =====================
-    const CATALOGS = {
-      'Data.gov (US)': { id:'datagov', enabled:true },
-      'Socrata Catalog': { id:'socrata', enabled:true },
-      'Zenodo': { id:'zenodo', enabled:true }
-    };
-    const chipsEl = document.getElementById('source-chips');
-    if(chipsEl){
-      Object.entries(CATALOGS).forEach(([name, obj])=>{
-        const lab = document.createElement('label'); lab.className='chip';
-        lab.innerHTML=`<input type="checkbox" ${obj.enabled?'checked':''}/> <span>${name}</span>`;
-        const cb = lab.querySelector('input'); cb.addEventListener('change', ()=> obj.enabled = cb.checked);
-        chipsEl.appendChild(lab);
-      });
-    }
-    async function fetchJSON(url){ const r=await fetch(url); if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }
-    const normalizeDate = d=>{const t=Date.parse(d);return isNaN(t)?0:t};
-    function setDsCount(n){ /* optional */ }
-    function renderDatasets(items){
-      const results = document.getElementById('results'); if(!results) return;
-      results.innerHTML=''; if(!items.length){ document.getElementById('empty').classList.remove('hidden'); return; } document.getElementById('empty').classList.add('hidden');
-      const frag=document.createDocumentFragment();
-      items.forEach(it=>{
-        const art=document.createElement('article'); art.className='card';
-        art.innerHTML=`<div class="content">
-          <div class="meta"><span>${it.source||''}</span><span>${it.date?new Date(it.date).toLocaleDateString():''}</span></div>
-          <div class="title"><a href="${it.link}" target="_blank" rel="noopener">${it.title||'Untitled dataset'}</a></div>
-          <div class="desc">${(it.description||'').replace(/<[^>]+>/g,'').slice(0,260)}${(it.description||'').length>260?'…':''}</div>
-        </div>`;
-        frag.appendChild(art);
-      }); results.appendChild(frag);
-    }
-    async function searchDataGov(q){ const u=`https://catalog.data.gov/api/3/action/package_search?rows=30&q=${encodeURIComponent(q)}`; const d=await fetchJSON(u); const hits=d?.result?.results||[]; return hits.map(x=>({title:x.title,description:x.notes,link:`https://catalog.data.gov/dataset/${x.name}`,date:x.metadata_modified,source:'Data.gov'})); }
-    async function searchSocrata(q){ const u=`https://api.us.socrata.com/api/catalog/v1?q=${encodeURIComponent(q)}&only=datasets&limit=30`; const d=await fetchJSON(u); const hits=d?.results||[]; return hits.map(x=>{const r=x.resource||{}, m=x.metadata||{}; return {title:r.name||m.name, description:r.description||m.description, link:x.permalink||r.permalink||'', date:m.updatedAt||m.createdAt, source:`Socrata: ${r.domain||''}`};}); }
-    async function searchZenodo(q){ const u=`https://zenodo.org/api/records?q=${encodeURIComponent(q)}&type=dataset&size=30&all_versions=false&sort=mostrecent`; const d=await fetchJSON(u); const hits=d?.hits?.hits||[]; return hits.map(x=>({title:x.metadata?.title, description:x.metadata?.description, link:x.links?.html||x.links?.latest_html, date:x.metadata?.publication_date, source:'Zenodo'})); }
-    async function runSearch(){ const q=el('#q').value.trim(); const enabled=Object.values(CATALOGS).filter(c=>c.enabled).map(c=>c.id); if(!q||!enabled.length){ alert('Enter a query and enable at least one source.'); return; } const tasks=[]; if(enabled.includes('datagov'))tasks.push(searchDataGov(q)); if(enabled.includes('socrata'))tasks.push(searchSocrata(q)); if(enabled.includes('zenodo'))tasks.push(searchZenodo(q)); const parts=await Promise.allSettled(tasks); const merged=parts.flatMap(r=> r.value||[]); merged.sort((a,b)=> normalizeDate(b.date)-normalizeDate(a.date)); renderDatasets(merged); }
-    const searchBtn = document.getElementById('search'); if(searchBtn){ searchBtn.addEventListener('click', runSearch); document.getElementById('q').addEventListener('keydown', e=>{ if(e.key==='Enter') runSearch(); }); }
   </script>
 </body>
 </html>
