@@ -224,16 +224,49 @@
       }catch{ return []; }
     }
 
-    async function loadSelectedFeeds(){
-      const enabled = [...document.querySelectorAll('input.src:checked')].map(x=>({url:x.dataset.url, cat:x.dataset.cat, name:x.parentElement.textContent.trim()}));
-      if(!enabled.length){ alert('Select at least one source.'); return []; }
-      const tasks = enabled.map(async({url,cat,name})=>{
-        const items = await fetchOneFeed(url, name);
-        return items.map(it=> ({...it, cat}));
-      });
-      const parts = await Promise.all(tasks);
-      return parts.flat();
-    }
+    async function loadSelectedFeedsIncremental() {
+    const enabled = [...document.querySelectorAll('input.src:checked')].map(x => ({
+      url: x.dataset.url,
+      cat: x.dataset.cat,
+      name: x.parentElement.textContent.trim()
+    }));
+    if (!enabled.length) { alert('Select at least one source.'); return []; }
+
+    // Reset UI before we start
+    ALL_ITEMS = [];
+    VISIBLE = 0;
+    document.querySelector('#results').innerHTML = '';
+    document.querySelector('#empty').classList.add('hidden');
+
+    // Render a tiny placeholder while first sources arrive
+    const placeholder = document.createElement('div');
+    placeholder.className = 'empty';
+    placeholder.textContent = 'Fetching…';
+    document.querySelector('#results').appendChild(placeholder);
+
+    const out = [];
+
+    await Promise.all(enabled.map(async ({ url, cat, name }) => {
+      try {
+        const xml = await fetchProxied(url);
+        const rows = xml ? parseFeed(xml, name).map(it => ({ ...it, cat })) : [];
+        out.push(...rows);
+
+      // Progressive update: re-filter/sort and append next batch if any
+        ALL_ITEMS = applyFiltersSort(out.slice());
+        if (placeholder.isConnected) placeholder.remove(); // remove once first results land
+        // If nothing has been shown yet, ensure the table is cleared
+        if (VISIBLE === 0) { document.querySelector('#results').innerHTML = ''; }
+
+        // Append until we've filled one "page" ahead of current scroll
+        if (VISIBLE < ALL_ITEMS.length) renderNextPage();
+      } catch {
+        // ignore this feed on error
+      }
+    }));
+
+    return out; // final merged list (already displayed incrementally)
+  }
 
     function applyFiltersSort(items){
       const kw = el('#q').value.trim().toLowerCase();
@@ -291,14 +324,24 @@
 
     // ---------------------- Events ----------------------
     async function runFetch(){
-      el('#empty').classList.add('hidden');
-      el('#results').innerHTML = '<div class="empty">Fetching…</div>';
-      const merged = await loadSelectedFeeds();
+      document.getElementById('empty').classList.add('hidden');
+      document.getElementById('results').innerHTML = '<div class="empty">Fetching…</div>';
+
+    // This will progressively update the UI as each feed finishes:
+      const merged = await loadSelectedFeedsIncremental();
+
+    // Safety: if after all feeds there’s still nothing, show empty state
       ALL_ITEMS = applyFiltersSort(merged);
-      clearResults();
-      if(!ALL_ITEMS.length){ el('#results').innerHTML=''; el('#empty').classList.remove('hidden'); setCount(0); return; }
-      renderNextPage();
+      if (!ALL_ITEMS.length) {
+        document.getElementById('results').innerHTML = '';
+        document.getElementById('empty').classList.remove('hidden');
+        setCount(0);
+        return;
     }
+
+  // If incremental already rendered, we’re done; ensure sentinel state is right
+  toggleSentinel();
+}
 
     document.getElementById('fetch').addEventListener('click', runFetch);
     document.getElementById('q').addEventListener('keydown', e=>{ if(e.key==='Enter') runFetch(); });
