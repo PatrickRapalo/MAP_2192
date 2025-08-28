@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>CSV Quick Insights ++ (Cleaner & Mini Dashboard)</title>
+  <title>CSV Quick Insights ++ (Stable, Working)</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <style>
     :root { --bg:#0f172a; --card:#111827; --muted:#94a3b8; --text:#e5e7eb; --accent:#60a5fa; }
@@ -16,21 +16,20 @@
     .card{background:rgba(17,24,39,.8); backdrop-filter: blur(6px); border:1px solid rgba(255,255,255,.06); border-radius:16px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.35)}
     .grid{display:grid; gap:16px}
     @media(min-width:1200px){ .grid{grid-template-columns: 360px 1fr} }
-    .drop{border:2px dashed rgba(255,255,255,.15); border-radius:12px; padding:18px; text-align:center; transition:.2s; margin-bottom:8px}
+    .drop{border:2px dashed rgba(255,255,255,.15); border-radius:12px; padding:18px; text-align:center; transition:.2s; cursor:pointer; margin-bottom:8px}
     .drop.dragover{border-color: var(--accent); background: rgba(96,165,250,.08)}
     .btn{display:inline-flex; align-items:center; gap:8px; background:linear-gradient(90deg,#2563eb,#7c3aed); border:none; color:white; padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:600}
     .btn.secondary{background:linear-gradient(90deg,#334155,#0f172a)}
     .btn:disabled{opacity:.5; cursor:not-allowed}
     .pill{display:inline-block; padding:2px 8px; border-radius:999px; background:#0b1226; border:1px solid rgba(255,255,255,.08); color:var(--muted); font-size:12px}
-    .controls{display:flex; flex-wrap:wrap; gap:10px; align-items:center}
-    .controls > *{flex:0 0 auto}
+    .controls{display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:6px}
     .controls input[type="text"], .controls input[type="url"], .controls select{flex:1 1 180px; min-width:160px; background:#0b1226; color:var(--text); border:1px solid rgba(255,255,255,.12); border-radius:10px; padding:8px 10px}
     input[type="number"]{background:#0b1226; color:var(--text); border:1px solid rgba(255,255,255,.12); border-radius:10px; padding:8px 10px}
     table{width:100%; border-collapse:collapse; font-size:14px}
     th, td{border-bottom:1px solid rgba(255,255,255,.08); padding:8px 10px; text-align:left}
     th{position:sticky; top:0; background:#0b1226; z-index:1}
     .scroll{max-height:380px; overflow:auto; border:1px solid rgba(255,255,255,.08); border-radius:12px}
-    details{background:#0b1226; border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:10px 12px}
+    details{background:#0b1226; border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:10px 12px; margin-bottom:6px}
     summary{cursor:pointer; font-weight:600}
     footer{color:var(--muted); text-align:center; padding:24px}
     .badge{padding:2px 6px; border-radius:8px; background:rgba(96,165,250,.15); color:#93c5fd; font-size:12px}
@@ -55,120 +54,110 @@
   <div class="wrap grid">
     <!-- LEFT PANEL -->
     <div class="card">
-      <h3 style="margin-top:0">1) Load data</h3>
+      <h3>1) Load data</h3>
       <div id="drop" class="drop">
-        <p style="margin:6px 0 8px">Drag & drop a .csv here or click to choose</p>
+        <p>Drag & drop a .csv here or click to choose</p>
         <input id="fileInput" type="file" accept=".csv" style="display:none" />
-        <button id="chooseBtn" class="btn">Choose CSV</button>
+        <button id="chooseBtn" class="btn" type="button">Choose CSV</button>
         <div style="margin-top:10px"><span class="pill">Max ~50MB • Local only</span></div>
       </div>
 
-      <div style="margin-top:16px" class="cols">
+      <div class="cols" style="margin-top:10px">
         <div>
-          <h4 style="margin:8px 0">Import from URL</h4>
+          <h4>Import from URL</h4>
           <div class="controls">
             <input id="urlInput" type="url" placeholder="https://example.com/data.csv" />
-            <button id="loadUrlBtn" class="btn">Load</button>
+            <button id="loadUrlBtn" class="btn" type="button">Load</button>
           </div>
-          <div class="hint">Tip: Many open-data portals expose direct CSV links. CORS must be allowed by the host.</div>
+          <div class="hint">Tip: The remote server must allow CORS for in-browser fetch.</div>
         </div>
         <div>
-          <h4 style="margin:8px 0">Search data.gov</h4>
+          <h4>Search data.gov</h4>
           <div class="controls">
             <input id="dgq" type="text" placeholder="e.g., traffic crashes florida" />
-            <button id="dgBtn" class="btn">Search</button>
+            <button id="dgBtn" class="btn" type="button">Search</button>
           </div>
           <div id="dgResults" class="list" style="margin-top:8px"></div>
-          <div class="hint">Powered by data.gov CKAN API. Only CSV resources are listed.</div>
+          <div class="hint">Only CSV resources are listed; some may block cross-origin downloads.</div>
         </div>
       </div>
 
-      <div style="margin-top:18px">
-        <h3 style="margin:0 0 8px">Quick chart</h3>
-        <div class="controls">
-          <label class="pill">Column</label>
-          <select id="columnSelect"></select>
-          <label class="pill">Bins (numeric)</label>
-          <input id="binInput" type="number" value="20" min="5" max="80" step="1" />
-          <button id="chartBtn" class="btn" disabled>Plot</button>
-        </div>
-        <div style="margin-top:10px; background:#0b1226; border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:10px">
-          <canvas id="chart" height="240"></canvas>
-        </div>
+      <h3 style="margin-top:18px">Quick chart</h3>
+      <div class="controls">
+        <label class="pill">Column</label>
+        <select id="columnSelect"></select>
+        <label class="pill">Bins (numeric)</label>
+        <input id="binInput" type="number" value="20" min="5" max="80" step="1" />
+        <button id="chartBtn" class="btn" type="button" disabled>Plot</button>
+      </div>
+      <div style="margin-top:10px; background:#0b1226; border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:10px">
+        <canvas id="chart" height="240"></canvas>
       </div>
 
-      <div style="margin-top:18px">
-        <h3 style="margin:0 0 8px">Cleaner</h3>
-        <details open>
-          <summary>Missing values</summary>
-          <div class="controls" style="margin-top:8px">
-            <label class="pill">Strategy</label>
-            <select id="missStrategy">
-              <option value="none">None</option>
-              <option value="drop">Drop rows with any missing</option>
-              <option value="median">Impute numeric → median; categorical → mode</option>
-              <option value="mean">Impute numeric → mean; categorical → mode</option>
-            </select>
-            <button id="applyMissing" class="btn secondary">Apply</button>
-          </div>
-        </details>
-        <details>
-          <summary>Duplicates</summary>
-          <div class="controls" style="margin-top:8px">
-            <label class="pill">Subset columns (optional, comma-separated)</label>
-            <input id="dupCols" type="text" placeholder="leave blank = entire row" />
-            <button id="dropDup" class="btn secondary">Drop duplicates</button>
-          </div>
-        </details>
-        <details>
-          <summary>Outliers (IQR)</summary>
-          <div class="controls" style="margin-top:8px">
-            <label class="pill">Action</label>
-            <select id="outAction">
-              <option value="flag">Flag only</option>
-              <option value="clip">Clip to [Q1-1.5*IQR, Q3+1.5*IQR]</option>
-              <option value="remove">Remove rows with outliers</option>
-            </select>
-            <button id="handleOut" class="btn secondary">Run</button>
-          </div>
-          <div id="outReport" class="hint" style="margin-top:6px"></div>
-        </details>
-        <div style="margin-top:10px" class="controls">
-          <button id="downloadCSV" class="btn">Download cleaned CSV</button>
+      <h3 style="margin-top:18px">Cleaner</h3>
+      <details open>
+        <summary>Missing values</summary>
+        <div class="controls" style="margin-top:8px">
+          <label class="pill">Strategy</label>
+          <select id="missStrategy">
+            <option value="none">None</option>
+            <option value="drop">Drop rows with any missing</option>
+            <option value="median">Impute numeric → median; categorical → mode</option>
+            <option value="mean">Impute numeric → mean; categorical → mode</option>
+          </select>
+          <button id="applyMissing" class="btn secondary" type="button">Apply</button>
         </div>
+      </details>
+      <details>
+        <summary>Duplicates</summary>
+        <div class="controls" style="margin-top:8px">
+          <label class="pill">Subset columns (optional, comma-separated)</label>
+          <input id="dupCols" type="text" placeholder="leave blank = entire row" />
+          <button id="dropDup" class="btn secondary" type="button">Drop duplicates</button>
+        </div>
+      </details>
+      <details>
+        <summary>Outliers (IQR)</summary>
+        <div class="controls" style="margin-top:8px">
+          <label class="pill">Action</label>
+          <select id="outAction">
+            <option value="flag">Flag only</option>
+            <option value="clip">Clip to [Q1-1.5*IQR, Q3+1.5*IQR]</option>
+            <option value="remove">Remove rows with outliers</option>
+          </select>
+          <button id="handleOut" class="btn secondary" type="button">Run</button>
+        </div>
+        <div id="outReport" class="hint" style="margin-top:6px"></div>
+      </details>
+      <div class="controls">
+        <button id="downloadCSV" class="btn" type="button">Download cleaned CSV</button>
       </div>
 
-      <div style="margin-top:18px">
-        <h3 style="margin:0 0 8px">Mini Dashboard</h3>
-        <div class="kpi" id="kpiRow"></div>
-        <div style="margin-top:10px; background:#0b1226; border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:10px">
-          <canvas id="dashChart" height="240"></canvas>
-        </div>
-        <div class="controls" style="margin-top:10px">
-          <label class="pill">X</label>
-          <select id="dashX"></select>
-          <label class="pill">Y (numeric)</label>
-          <select id="dashY"></select>
-          <button id="dashPlot" class="btn" disabled>Build Chart</button>
-          <button id="exportDash" class="btn secondary" disabled>Export Dashboard HTML</button>
-        </div>
+      <h3 style="margin-top:18px">Mini Dashboard</h3>
+      <div class="kpi" id="kpiRow"></div>
+      <div style="margin-top:10px; background:#0b1226; border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:10px">
+        <canvas id="dashChart" height="240"></canvas>
+      </div>
+      <div class="controls" style="margin-top:10px">
+        <label class="pill">X</label>
+        <select id="dashX"></select>
+        <label class="pill">Y (numeric)</label>
+        <select id="dashY"></select>
+        <button id="dashPlot" class="btn" type="button" disabled>Build Chart</button>
+        <button id="exportDash" class="btn secondary" type="button" disabled>Export Dashboard HTML</button>
       </div>
 
-      <div style="margin-top:18px">
-        <h3 style="margin:0 0 8px">Find columns</h3>
-        <input id="colSearch" type="text" placeholder="Filter columns by name…" />
-      </div>
+      <h3 style="margin-top:18px">Find columns</h3>
+      <input id="colSearch" type="text" placeholder="Filter columns by name…" />
 
-      <div style="margin-top:18px">
-        <details>
-          <summary>Tips</summary>
-          <ul>
-            <li>Import via URL or data.gov search; if a CSV fails due to CORS, download it and load locally.</li>
-            <li>Cleaner actions are <b>destructive in-memory</b> (use Download to save a version).</li>
-            <li>Dashboard export creates a self-contained HTML you can host anywhere.</li>
-          </ul>
-        </details>
-      </div>
+      <details style="margin-top:18px">
+        <summary>Tips</summary>
+        <ul>
+          <li>If a remote CSV fails due to CORS, download it and load locally.</li>
+          <li>Cleaner actions modify in-memory data. Use Download to save.</li>
+          <li>Dashboard export gives you a self-contained HTML file.</li>
+        </ul>
+      </details>
     </div>
 
     <!-- RIGHT PANEL -->
@@ -291,7 +280,7 @@
           const row = document.createElement('div');
           row.style.border='1px solid rgba(255,255,255,.08)'; row.style.borderRadius='10px'; row.style.padding='8px';
           row.innerHTML = `<div style="font-weight:700">${escapeHtml(title)}</div><div class="hint">${escapeHtml(name)}</div><div class="hint">${escapeHtml(url)}</div>`;
-          const b = document.createElement('button'); b.className='btn secondary'; b.textContent='Load CSV'; b.style.marginTop='6px';
+          const b = document.createElement('button'); b.className='btn secondary'; b.type='button'; b.textContent='Load CSV'; b.style.marginTop='6px';
           b.addEventListener('click', async ()=>{
             meta.textContent = `Fetching ${url} …`;
             try{ const r = await fetch(url); if(!r.ok) throw new Error(`HTTP ${r.status}`); const t = await r.text(); parseCSVText(t, name||'data.csv'); }
@@ -433,7 +422,7 @@
       if(!raw.length) return;
       const cols = dupCols.value.split(',').map(s=>s.trim()).filter(Boolean);
       const seen = new Set();
-      const keyFor = (row)=> (cols.length? cols : columns).map(c=> String(row[c]??'')).join('\u241f');
+      const keyFor = (row)=> (cols.length? cols : columns).map(c=> String(row[c]??'')).join('␟');
       const before = raw.length;
       raw = raw.filter(r=>{ const k=keyFor(r); if(seen.has(k)) return false; seen.add(k); return true; });
       const removed = before - raw.length;
@@ -481,12 +470,14 @@
 
     downloadCSV.addEventListener('click', ()=>{
       if(!raw.length) return;
-      const rows = [columns.join(','), ...raw.map(r=> columns.map(c=> escapeCsv(r[c])).join(','))].join('\n');
+      const rows = [columns.join(','), ...raw.map(r=> columns.map(c=> escapeCsv(r[c])).join(','))].join('
+');
       const blob = new Blob([rows], {type:'text/csv'});
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'cleaned.csv'; a.click(); URL.revokeObjectURL(a.href);
     });
 
-    function escapeCsv(v){ if(v==null) return ''; const s=String(v); if(/[",\n]/.test(s)) return '"'+s.replace(/"/g,'""')+'"'; return s; }
+    function escapeCsv(v){ if(v==null) return ''; const s=String(v); if(/[",
+]/.test(s)) return '"'+s.replace(/"/g,'""')+'"'; return s; }
 
     // Mini dashboard
     function buildKPIs(){
@@ -535,7 +526,9 @@
         <script src=\"https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js\"></script>
         <style>body{font-family:system-ui, -apple-system, Segoe UI, Roboto; margin:24px; background:#0b1025; color:#e5e7eb} .wrap{max-width:1100px;margin:0 auto} h1{margin:0 0 6px} .card{background:#0b1226;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px;margin:10px 0} .kpi{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:10px} .kpicard{background:#0b132a;border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:12px} .kpit{color:#a5b4fc;font-size:12px} .kpiv{font-size:22px;font-weight:800}</style>
         </head><body><div class=\"wrap\"><h1>${title}</h1><div class=\"card\" id=\"kpis\"></div><div class=\"card\"><canvas id=\"c\" height=\"260\"></canvas><div style=\"margin-top:8px\">X: <select id=\"x\"></select> Y (numeric): <select id=\"y\"></select> <button id=\"plot\">Plot</button></div></div></div>
-        <script>const data=${JSON.stringify(data)};const C=data.columns;const R=data.rows;const e=(id)=>document.getElementById(id);function isN(v){return v!==''&&v!=null&&!isNaN(+v)&&isFinite(+v)};function m(a){return a.reduce((x,y)=>x+y,0)/a.length};function q(a,p){if(!a.length)return NaN;const s=a.slice().sort((x,y)=>x-y);const pos=(s.length-1)*p;const b=Math.floor(pos),r=pos-b;return s[b]+(s[b+1]-s[b])*(r||0)};function addK(container,t,v){const d=document.createElement('div');d.className='kpicard';d.innerHTML='<div class=\"kpit\">'+t+'</div><div class=\"kpiv\">'+v+'</div>';container.appendChild(d);}const k=e('kpis'), kgrid=document.createElement('div');kgrid.className='kpi';k.appendChild(kgrid);const totalRows=R.length,totalCols=C.length;let miss=0;R.forEach(r=>C.forEach(c=>{if(r[c]===''||r[c]==null)miss++;}));const missPct=(totalRows*totalCols)?(miss/(totalRows*totalCols)*100).toFixed(2)+'%':'0%';const numCols=C.filter(c=>{const vals=R.map(r=>r[c]).filter(v=>v!==''&&v!=null);const n=vals.filter(isN).length;return vals.length&&(n/vals.length>0.8)});let first=numCols[0];let avg='n/a';if(first){const ns=R.map(r=>r[first]).filter(isN).map(Number);avg=(m(ns)).toFixed(2);}addK(kgrid,'Rows', totalRows.toLocaleString());addK(kgrid,'Columns', totalCols.toLocaleString());addK(kgrid,'% Missing', missPct);addK(kgrid, first?('Avg('+first+')'):'Numeric Cols', first?avg:String(numCols.length));const xs=e('x'), ys=e('y');xs.innerHTML=C.map(c=>'\n<option>'+c+'</option>').join('');ys.innerHTML=numCols.map(c=>'\n<option>'+c+'</option>').join('');let chart; e('plot').onclick=()=>{if(chart)chart.destroy();const x=xs.value,y=ys.value;const map=new Map();for(const r of R){const k=String(r[x]??'');const v=isN(r[y])?+r[y]:NaN;if(!isNaN(v))map.set(k,(map.get(k)||0)+v);}const labels=Array.from(map.keys());const vals=labels.map(k=>map.get(k));chart=new Chart(e('c').getContext('2d'),{type:'bar',data:{labels,datasets:[{label:y+' by '+x,data:vals}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});};</script></body></html>`;
+        <script>const data=${JSON.stringify(data)};const C=data.columns;const R=data.rows;const e=(id)=>document.getElementById(id);function isN(v){return v!==''&&v!=null&&!isNaN(+v)&&isFinite(+v)};function m(a){return a.reduce((x,y)=>x+y,0)/a.length};function q(a,p){if(!a.length)return NaN;const s=a.slice().sort((x,y)=>x-y);const pos=(s.length-1)*p;const b=Math.floor(pos),r=pos-b;return s[b]+(s[b+1]-s[b])*(r||0)};function addK(container,t,v){const d=document.createElement('div');d.className='kpicard';d.innerHTML='<div class=\"kpit\">'+t+'</div><div class=\"kpiv\">'+v+'</div>';container.appendChild(d);}const k=e('kpis'), kgrid=document.createElement('div');kgrid.className='kpi';k.appendChild(kgrid);const totalRows=R.length,totalCols=C.length;let miss=0;R.forEach(r=>C.forEach(c=>{if(r[c]===''||r[c]==null)miss++;}));const missPct=(totalRows*totalCols)?(miss/(totalRows*totalCols)*100).toFixed(2)+'%':'0%';const numCols=C.filter(c=>{const vals=R.map(r=>r[c]).filter(v=>v!==''&&v!=null);const n=vals.filter(isN).length;return vals.length&&(n/vals.length>0.8)});let first=numCols[0];let avg='n/a';if(first){const ns=R.map(r=>r[first]).filter(isN).map(Number);avg=(m(ns)).toFixed(2);}addK(kgrid,'Rows', totalRows.toLocaleString());addK(kgrid,'Columns', totalCols.toLocaleString());addK(kgrid,'% Missing', missPct);addK(kgrid, first?('Avg('+first+')'):'Numeric Cols', first?avg:String(numCols.length));const xs=e('x'), ys=e('y');xs.innerHTML=C.map(c=>'
+<option>'+c+'</option>').join('');ys.innerHTML=numCols.map(c=>'
+<option>'+c+'</option>').join('');let chart; e('plot').onclick=()=>{if(chart)chart.destroy();const x=xs.value,y=ys.value;const map=new Map();for(const r of R){const k=String(r[x]??'');const v=isN(r[y])?+r[y]:NaN;if(!isNaN(v))map.set(k,(map.get(k)||0)+v);}const labels=Array.from(map.keys());const vals=labels.map(k=>map.get(k));chart=new Chart(e('c').getContext('2d'),{type:'bar',data:{labels,datasets:[{label:y+' by '+x,data:vals}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});};</script></body></html>`;
     }
 
     function refreshAll(){
@@ -548,10 +541,20 @@
       exportDash.disabled = !raw.length;
     }
 
-    // Demo boot (wrapped)
+    // Demo boot
     window.addEventListener('DOMContentLoaded', ()=>{
       try{
-        const demoCSV = `age,gender,income,city\n23,M,42000,Miami\n35,F,68000,Boca Raton\n29,F,52000,Miami\n41,M,91000,Orlando\n33,M,57000,Miami\n28,F,61000,Tampa\n54,M,120000,Miami\n22,F,39000,Orlando\n38,F,74000,Tampa\n46,M,85000,Boca Raton`;
+        const demoCSV = `age,gender,income,city
+23,M,42000,Miami
+35,F,68000,Boca Raton
+29,F,52000,Miami
+41,M,91000,Orlando
+33,M,57000,Miami
+28,F,61000,Tampa
+54,M,120000,Miami
+22,F,39000,Orlando
+38,F,74000,Tampa
+46,M,85000,Boca Raton`;
         parseCSVText(demoCSV, 'demo.csv');
       }catch(e){ const m=document.getElementById('meta'); if(m) m.textContent='Init error: '+e.message; }
     });
