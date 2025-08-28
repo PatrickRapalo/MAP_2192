@@ -28,7 +28,13 @@
     .empty{text-align:center;padding:26px 10px;color:var(--muted)}
     .hidden{display:none!important}
     /* right column list scrolls independently on tall pages */
-    #sources{max-height:70vh;overflow:auto;-webkit-overflow-scrolling:touch}
+    aside.panel {
+      max-height: 80vh;       /* cap height of the entire sources panel */
+      overflow-y: auto;       /* make it scroll independently */
+      position: sticky;
+      top: 100px;             /* stays visible while scrolling articles */
+      align-self: flex-start; /* ensures independent sizing */
+    }
   </style>
 </head>
 <body>
