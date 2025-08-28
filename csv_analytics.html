@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CSV Quick Insights ++ (Cleaner & Mini Dashboard)</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <style>
+    :root { --bg:#0f172a; --card:#111827; --muted:#94a3b8; --text:#e5e7eb; --accent:#60a5fa; }
+    *{box-sizing:border-box}
+    body{margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto; background:linear-gradient(180deg,#0b1025,#0f172a 20%,#0b1025); color:var(--text)}
+    header{padding:24px 16px; text-align:center}
+    h1{margin:0; font-size:clamp(20px,4vw,28px)}
+    .sub{color:var(--muted)}
+    .wrap{max-width:1300px; margin:0 auto; padding:16px}
+    .card{background:rgba(17,24,39,.8); backdrop-filter: blur(6px); border:1px solid rgba(255,255,255,.06); border-radius:16px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    .grid{display:grid; gap:16px}
+    @media(min-width:1200px){ .grid{grid-template-columns: 360px 1fr} }
+    .drop{border:2px dashed rgba(255,255,255,.15); border-radius:12px; padding:18px; text-align:center; transition:.2s}
+    .drop.dragover{border-color: var(--accent); background: rgba(96,165,250,.08)}
+    .btn{display:inline-flex; align-items:center; gap:8px; background:linear-gradient(90deg,#2563eb,#7c3aed); border:none; color:white; padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:600}
+    .btn.secondary{background:linear-gradient(90deg,#334155,#0f172a)}
+    .btn:disabled{opacity:.5; cursor:not-allowed}
+    .pill{display:inline-block; padding:2px 8px; border-radius:999px; background:#0b1226; border:1px solid rgba(255,255,255,.08); color:var(--muted); font-size:12px}
+    .controls{display:flex; flex-wrap:wrap; gap:10px; align-items:center}
+    select, input[type="number"], input[type="text"], input[type="url"]{background:#0b1226; color:var(--text); border:1px solid rgba(255,255,255,.12); border-radius:10px; padding:8px 10px}
+    table{width:100%; border-collapse:collapse; font-size:14px}
+    th, td{border-bottom:1px solid rgba(255,255,255,.08); padding:8px 10px; text-align:left}
+    th{position:sticky; top:0; background:#0b1226; z-index:1}
+    .scroll{max-height:380px; overflow:auto; border:1px solid rgba(255,255,255,.08); border-radius:12px}
+    details{background:#0b1226; border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:10px 12px}
+    summary{cursor:pointer; font-weight:600}
+    footer{color:var(--muted); text-align:center; padding:24px}
+    .badge{padding:2px 6px; border-radius:8px; background:rgba(96,165,250,.15); color:#93c5fd; font-size:12px}
+    .cols{display:grid; gap:12px}
+    @media(min-width:900px){ .cols{grid-template-columns: 1fr 1fr} }
+    .list{display:grid; gap:8px}
+    .hint{color:var(--muted); font-size:13px}
+    .kpi{display:grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap:10px}
+    .kpicard{background:#0b1226; border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:12px}
+    .kpit{color:#a5b4fc; font-size:12px; letter-spacing:.4px}
+    .kpiv{font-size:22px; font-weight:800}
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>CSV Quick Insights ++</h1>
+    <div class="sub">Upload or import a CSV → profile it → clean it → build a mini dashboard → export. All in your browser.</div>
+  </header>
+
+  <div class="wrap grid">
+    <!-- LEFT PANEL -->
+    <div class="card">
+      <h3 style="margin-top:0">1) Load data</h3>
+      <div id="drop" class="drop">
+        <p style="margin:6px 0 8px">Drag & drop a .csv here or click to choose</p>
+        <input id="fileInput" type="file" accept=".csv" style="display:none" />
+        <button id="chooseBtn" class="btn">Choose CSV</button>
+        <div style="margin-top:10px"><span class="pill">Max ~50MB • Local only</span></div>
+      </div>
+
+      <div style="margin-top:16px" class="cols">
+        <div>
+          <h4 style="margin:8px 0">Import from URL</h4>
+          <div class="controls">
+            <input id="urlInput" type="url" placeholder="https://example.com/data.csv" style="flex:1"/>
+            <button id="loadUrlBtn" class="btn">Load</button>
+          </div>
+          <div class="hint">Tip: Many open-data portals expose direct CSV links. CORS must be allowed by the host.</div>
+        </div>
+        <div>
+          <h4 style="margin:8px 0">Search data.gov</h4>
+          <div class="controls">
+            <input id="dgq" type="text" placeholder="e.g., traffic crashes florida" style="flex:1"/>
+            <button id="dgBtn" class="btn">Search</button>
+          </div>
+          <div id="dgResults" class="list" style="margin-top:8px"></div>
+          <div class="hint">Powered by data.gov CKAN API. Only CSV resources are listed.</div>
+        </div>
+      </div>
+
+      <div style="margin-top:18px">
+        <h3 style="margin:0 0 8px">Quick chart</h3>
+        <div class="controls">
+          <label class="pill">Column</label>
+          <select id="columnSelect"></select>
+          <label class="pill">Bins (numeric)</label>
+          <input id="binInput" type="number" value="20" min="5" max="80" step="1" />
+          <button id="chartBtn" class="btn" disabled>Plot</button>
+        </div>
+        <div style="margin-top:10px; background:#0b1226; border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:10px">
+          <canvas id="chart" height="240"></canvas>
+        </div>
+      </div>
+
+      <div style="margin-top:18px">
+        <h3 style="margin:0 0 8px">Cleaner</h3>
+        <details open>
+          <summary>Missing values</summary>
+          <div class="controls" style="margin-top:8px">
+            <label class="pill">Strategy</label>
+            <select id="missStrategy">
+              <option value="none">None</option>
+              <option value="drop">Drop rows with any missing</option>
+              <option value="median">Impute numeric → median; categorical → mode</option>
+              <option value="mean">Impute numeric → mean; categorical → mode</option>
+            </select>
+            <button id="applyMissing" class="btn secondary">Apply</button>
+          </div>
+        </details>
+        <details>
+          <summary>Duplicates</summary>
+          <div class="controls" style="margin-top:8px">
+            <label class="pill">Subset columns (optional, comma-separated)</label>
+            <input id="dupCols" type="text" placeholder="leave blank = entire row" style="flex:1" />
+            <button id="dropDup" class="btn secondary">Drop duplicates</button>
+          </div>
+        </details>
+        <details>
+          <summary>Outliers (IQR)</summary>
+          <div class="controls" style="margin-top:8px">
+            <label class="pill">Action</label>
+            <select id="outAction">
+              <option value="flag">Flag only</option>
+              <option value="clip">Clip to [Q1-1.5*IQR, Q3+1.5*IQR]</option>
+              <option value="remove">Remove rows with outliers</option>
+            </select>
+            <button id="handleOut" class="btn secondary">Run</button>
+          </div>
+          <div id="outReport" class="hint" style="margin-top:6px"></div>
+        </details>
+        <div style="margin-top:10px" class="controls">
+          <button id="downloadCSV" class="btn">Download cleaned CSV</button>
+        </div>
+      </div>
+
+      <div style="margin-top:18px">
+        <h3 style="margin:0 0 8px">Mini Dashboard</h3>
+        <div class="kpi" id="kpiRow"></div>
+        <div style="margin-top:10px; background:#0b1226; border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:10px">
+          <canvas id="dashChart" height="240"></canvas>
+        </div>
+        <div class="controls" style="margin-top:10px">
+          <label class="pill">X</label>
+          <select id="dashX"></select>
+          <label class="pill">Y (numeric)</label>
+          <select id="dashY"></select>
+          <button id="dashPlot" class="btn" disabled>Build Chart</button>
+          <button id="exportDash" class="btn secondary" disabled>Export Dashboard HTML</button>
+        </div>
+      </div>
+
+      <div style="margin-top:18px">
+        <h3 style="margin:0 0 8px">Find columns</h3>
+        <input id="colSearch" type="text" placeholder="Filter columns by name…" />
+      </div>
+
+      <div style="margin-top:18px">
+        <details>
+          <summary>Tips</summary>
+          <ul>
+            <li>Import via URL or data.gov search; if a CSV fails due to CORS, download it and load locally.</li>
+            <li>Cleaner actions are <b>destructive in-memory</b> (use Download to save a version).</li>
+            <li>Dashboard export creates a self-contained HTML you can host anywhere.</li>
+          </ul>
+        </details>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div class="card">
+      <div style="display:flex; align-items:center; gap:10px; justify-content:space-between; flex-wrap:wrap">
+        <h3 style="margin:0">Preview & Profiling</h3>
+        <div id="meta" class="pill">No file loaded</div>
+      </div>
+
+      <h4 style="margin:12px 0 6px">Sample rows</h4>
+      <div class="scroll"><table id="preview"></table></div>
+
+      <h4 style="margin:16px 0 6px">Column profiles</h4>
+      <div id="profiles" class="scroll" style="padding:10px"></div>
+    </div>
+  </div>
+
+  <footer>
+    Built with <span class="badge">Papa Parse</span> and <span class="badge">Chart.js</span> • MIT License
+  </footer>
+
+  <script>
+    // --- Helpers ---
+    const isNumeric = (v) => v !== null && v !== '' && !isNaN(+v) && isFinite(+v);
+    const toNum = (v) => +v;
+    const quantile = (arr, q) => { if(!arr.length) return NaN; const pos=(arr.length-1)*q; const base=Math.floor(pos); const rest=pos-base; return arr[base] + (arr[base+1]-arr[base])*(rest||0); };
+    const mean = (arr)=> arr.length? arr.reduce((a,b)=>a+b,0)/arr.length : NaN;
+    const std = (arr)=>{ if(arr.length<2) return 0; const m=mean(arr); return Math.sqrt(arr.reduce((a,x)=>a+(x-m)*(x-m),0)/(arr.length-1)); };
+    const escapeHtml = (val)=> val==null? '' : String(val).replace(/[&<>\"]/g, s=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[s]));
+
+    let raw = []; // array of objects
+    let columns = [];
+    let chart, dashChart; // Chart.js instances
+
+    // Elements
+    const drop = document.getElementById('drop');
+    const fileInput = document.getElementById('fileInput');
+    const chooseBtn = document.getElementById('chooseBtn');
+    const previewTable = document.getElementById('preview');
+    const profilesDiv = document.getElementById('profiles');
+    const meta = document.getElementById('meta');
+    const columnSelect = document.getElementById('columnSelect');
+    const binInput = document.getElementById('binInput');
+    const chartBtn = document.getElementById('chartBtn');
+    const colSearch = document.getElementById('colSearch');
+
+    const urlInput = document.getElementById('urlInput');
+    const loadUrlBtn = document.getElementById('loadUrlBtn');
+    const dgq = document.getElementById('dgq');
+    const dgBtn = document.getElementById('dgBtn');
+    const dgResults = document.getElementById('dgResults');
+
+    const missStrategy = document.getElementById('missStrategy');
+    const applyMissing = document.getElementById('applyMissing');
+    const dupCols = document.getElementById('dupCols');
+    const dropDup = document.getElementById('dropDup');
+    const outAction = document.getElementById('outAction');
+    const handleOut = document.getElementById('handleOut');
+    const outReport = document.getElementById('outReport');
+    const downloadCSV = document.getElementById('downloadCSV');
+
+    const kpiRow = document.getElementById('kpiRow');
+    const dashX = document.getElementById('dashX');
+    const dashY = document.getElementById('dashY');
+    const dashPlot = document.getElementById('dashPlot');
+    const dashCanvas = document.getElementById('dashChart').getContext('2d');
+    const exportDash = document.getElementById('exportDash');
+
+    // Drag & drop
+    ;['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev, e=>{e.preventDefault(); drop.classList.add('dragover')}));
+    ;['dragleave','drop'].forEach(ev=>drop.addEventListener(ev, e=>{e.preventDefault(); drop.classList.remove('dragover')}));
+    drop.addEventListener('click', ()=> fileInput.click());
+    chooseBtn.addEventListener('click', ()=> fileInput.click());
+    drop.addEventListener('drop', (e)=> handleFile(e.dataTransfer.files?.[0]));
+    fileInput.addEventListener('change', (e)=> handleFile(e.target.files?.[0]));
+
+    function parseCSVText(text, name='data.csv'){
+      Papa.parse(text, {
+        header: true,
+        dynamicTyping: false,
+        skipEmptyLines: true,
+        worker: true,
+        complete: (res)=>{
+          raw = res.data;
+          columns = res.meta.fields || Object.keys(raw[0]||{});
+          meta.textContent = `${name} • ${raw.length.toLocaleString()} rows × ${columns.length} cols`;
+          refreshAll();
+        },
+        error: (err)=>{ meta.textContent = `Error: ${err}`; console.error(err); }
+      });
+    }
+
+    function handleFile(file){ if(!file) return; meta.textContent = `Parsing ${file.name}…`; const fr=new FileReader(); fr.onload=()=>parseCSVText(fr.result, file.name); fr.readAsText(file); }
+
+    // URL loader
+    loadUrlBtn.addEventListener('click', async ()=>{
+      const url = urlInput.value.trim(); if(!url) return;
+      meta.textContent = `Fetching ${url} …`;
+      try{
+        const res = await fetch(url);
+        if(!res.ok) throw new Error(`HTTP ${res.status}`);
+        const text = await res.text();
+        parseCSVText(text, url.split('/').pop()||'remote.csv');
+      }catch(e){ meta.textContent = `Fetch failed (CORS or network): ${e.message}`; }
+    });
+
+    // data.gov search (CKAN)
+    dgBtn.addEventListener('click', async ()=>{
+      const q = encodeURIComponent(dgq.value.trim());
+      if(!q) return;
+      dgResults.innerHTML = '<span class="pill">Searching…</span>';
+      try{
+        const res = await fetch(`https://catalog.data.gov/api/3/action/package_search?q=${q}`);
+        const json = await res.json();
+        const items = (json.result?.results||[]).flatMap(pkg=> (pkg.resources||[]).filter(r=> /csv/i.test(r.format||r.mimetype||'')).map(r=>({title:pkg.title, url:r.url, name:r.name||r.url})));
+        if(!items.length){ dgResults.innerHTML = '<div class="hint">No CSV resources found. Try another query.</div>'; return; }
+        dgResults.innerHTML = '';
+        items.slice(0,15).forEach(({title,url,name})=>{
+          const row = document.createElement('div');
+          row.style.border='1px solid rgba(255,255,255,.08)'; row.style.borderRadius='10px'; row.style.padding='8px';
+          row.innerHTML = `<div style="font-weight:700">${escapeHtml(title)}</div><div class="hint">${escapeHtml(name)}</div><div class="hint">${escapeHtml(url)}</div>`;
+          const b = document.createElement('button'); b.className='btn secondary'; b.textContent='Load CSV'; b.style.marginTop='6px';
+          b.addEventListener('click', async ()=>{
+            meta.textContent = `Fetching ${url} …`;
+            try{ const r = await fetch(url); if(!r.ok) throw new Error(`HTTP ${r.status}`); const t = await r.text(); parseCSVText(t, name||'data.csv'); }
+            catch(e){ meta.textContent = `Fetch failed (CORS or network): ${e.message}`; }
+          });
+          row.appendChild(b); dgResults.appendChild(row);
+        });
+      }catch(e){ dgResults.innerHTML = `<div class="hint">Search failed: ${escapeHtml(e.message)}</div>`; }
+    });
+
+    function populatePreview(){
+      if(!raw.length){ previewTable.innerHTML = ''; return; }
+      const maxRows = 100;
+      const rows = raw.slice(0, maxRows);
+      let html = '<thead><tr>' + columns.map(c=>`<th>${escapeHtml(c)}</th>`).join('') + '</tr></thead>';
+      html += '<tbody>' + rows.map(r=>'<tr>' + columns.map(c=>`<td>${escapeHtml(r[c])}</td>`).join('') + '</tr>').join('') + '</tbody>';
+      previewTable.innerHTML = html;
+    }
+
+    function buildProfiles(){
+      if(!raw.length){ profilesDiv.innerHTML = ''; return; }
+      const searchTerm = colSearch.value.trim().toLowerCase();
+      profilesDiv.innerHTML = '';
+      columns.forEach(col=>{
+        if(searchTerm && !col.toLowerCase().includes(searchTerm)) return;
+        const vals = raw.map(r=> r[col]).filter(v=> v !== undefined);
+        const missing = vals.filter(v=> v === null || v === '').length;
+        const nonMissingVals = vals.filter(v=> v !== null && v !== '');
+        const numericVals = nonMissingVals.filter(isNumeric).map(toNum);
+        const isNum = nonMissingVals.length && (numericVals.length / nonMissingVals.length > 0.8);
+
+        let content = '';
+        if(isNum){
+          const sorted = numericVals.slice().sort((a,b)=>a-b);
+          const count = nonMissingVals.length;
+          const m = mean(sorted);
+          const med = quantile(sorted, 0.5);
+          const p05 = quantile(sorted, 0.05);
+          const p95 = quantile(sorted, 0.95);
+          const min = sorted[0];
+          const max = sorted[sorted.length-1];
+          const uniq = new Set(sorted.map(v=> Number.isInteger(v)? v : v.toFixed(6))).size;
+          const s = std(sorted);
+          content = `
+            <div><span class="pill">type: numeric</span></div>
+            <div>count: <b>${count.toLocaleString()}</b> • missing: <b>${missing.toLocaleString()}</b> • unique: <b>${uniq.toLocaleString()}</b></div>
+            <div>mean: <b>${fmt(m)}</b> • median: <b>${fmt(med)}</b> • stdev: <b>${fmt(s)}</b></div>
+            <div>min: <b>${fmt(min)}</b> • p05: <b>${fmt(p05)}</b> • p95: <b>${fmt(p95)}</b> • max: <b>${fmt(max)}</b></div>
+          `;
+        } else {
+          const freq = Object.create(null);
+          for(const v of nonMissingVals){ const k = String(v); freq[k] = (freq[k]||0)+1; }
+          const entries = Object.entries(freq).sort((a,b)=>b[1]-a[1]);
+          const top = entries.slice(0,5).map(([k,v])=>`<li><b>${escapeHtml(k)}</b> — ${v.toLocaleString()}</li>`).join('');
+          content = `
+            <div><span class="pill">type: categorical</span></div>
+            <div>count: <b>${nonMissingVals.length.toLocaleString()}</b> • missing: <b>${missing.toLocaleString()}</b> • unique: <b>${entries.length.toLocaleString()}</b></div>
+            <div style="margin-top:6px">Top values:</div>
+            <ul style="margin:6px 0 0 18px">${top || '<li>(no values)</li>'}</ul>
+          `;
+        }
+
+        const box = document.createElement('div');
+        box.style.marginBottom = '10px';
+        box.style.border = '1px solid rgba(255,255,255,.08)';
+        box.style.borderRadius = '10px';
+        box.style.padding = '10px';
+        box.innerHTML = `<div style="font-weight:700; margin-bottom:6px">${escapeHtml(col)}</div>${content}`;
+        profilesDiv.appendChild(box);
+      });
+    }
+
+    function fillColumnSelects(){
+      const opts = columns.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+      columnSelect.innerHTML = opts;
+      dashX.innerHTML = opts;
+      dashY.innerHTML = columns.filter(c=> isMostlyNumeric(colValues(c))).map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    }
+
+    function colValues(col){ return raw.map(r=> r[col]).filter(v=> v !== null && v !== undefined && v !== ''); }
+    function isMostlyNumeric(vals){ const n = vals.filter(isNumeric).length; return vals.length && (n/vals.length>0.8); }
+
+    colSearch.addEventListener('input', ()=>{ buildProfiles(); });
+
+    chartBtn.addEventListener('click', ()=>{
+      if(!raw.length) return;
+      const col = columnSelect.value;
+      const vals = colValues(col);
+      const numericVals = vals.filter(isNumeric).map(toNum);
+      const ctx = document.getElementById('chart').getContext('2d');
+      if(chart) chart.destroy();
+
+      if(numericVals.length / vals.length > 0.8){
+        const bins = Math.max(5, Math.min(80, Number(binInput.value)||20));
+        numericVals.sort((a,b)=>a-b);
+        const min = numericVals[0], max = numericVals[numericVals.length-1];
+        const width = (max - min) / bins || 1;
+        const edges = Array.from({length: bins+1}, (_,i)=> min + i*width);
+        const counts = new Array(bins).fill(0);
+        for(const x of numericVals){ let idx = Math.floor((x - min) / width); if(idx < 0) idx = 0; if(idx >= bins) idx = bins-1; counts[idx]++; }
+        const labels = counts.map((_,i)=> `${fmt(edges[i])}–${fmt(edges[i+1])}`);
+        chart = new Chart(ctx, { type: 'bar', data: { labels, datasets: [{ label: `${col} histogram (${bins} bins)`, data: counts }] }, options: { responsive:true, plugins:{ legend:{ display:false } }, scales:{ x:{ ticks:{ autoSkip:true, maxRotation:0 } }, y:{ beginAtZero:true } } }});
+      } else {
+        const freq = Object.create(null); for(const v of vals){ const k = String(v); freq[k] = (freq[k]||0)+1; }
+        const top = Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,10);
+        chart = new Chart(ctx, { type: 'bar', data: { labels: top.map(x=>x[0]), datasets: [{ label: `${col} (Top 10)`, data: top.map(x=>x[1]) }] }, options: { responsive:true, plugins:{ legend:{ display:false } }, scales:{ y:{ beginAtZero:true } } }});
+      }
+    });
+
+    // Cleaner actions
+    applyMissing.addEventListener('click', ()=>{
+      if(!raw.length) return;
+      const strat = missStrategy.value;
+      if(strat==='none') return;
+      if(strat==='drop'){
+        raw = raw.filter(r=> columns.every(c=> r[c]!=='' && r[c]!==null && r[c]!==undefined));
+      } else {
+        // compute column-wise fillers
+        const fillers = {};
+        columns.forEach(c=>{
+          const vals = colValues(c);
+          const nums = vals.filter(isNumeric).map(toNum);
+          if(nums.length/Math.max(vals.length,1) > 0.8){
+            const sorted = nums.slice().sort((a,b)=>a-b);
+            const fill = strat==='median' ? quantile(sorted,0.5) : mean(sorted);
+            fillers[c] = fill;
+          } else {
+            // mode for categorical
+            const freq = Object.create(null); vals.forEach(v=>{ const k=String(v); freq[k]=(freq[k]||0)+1; });
+            let mode=null, best=-1; for(const [k,v] of Object.entries(freq)){ if(v>best){best=v; mode=k;} }
+            fillers[c] = mode ?? '';
+          }
+        });
+        raw = raw.map(r=>{ const x={...r}; columns.forEach(c=>{ if(x[c]===''||x[c]===null||x[c]===undefined) x[c]=fillers[c]; }); return x; });
+      }
+      meta.textContent += ' • (missing handled)';
+      refreshAll();
+    });
+
+    dropDup.addEventListener('click', ()=>{
+      if(!raw.length) return;
+      const cols = dupCols.value.split(',').map(s=>s.trim()).filter(Boolean);
+      const seen = new Set();
+      const keyFor = (row)=> (cols.length? cols : columns).map(c=> String(row[c]??'')).join('␟');
+      const before = raw.length;
+      raw = raw.filter(r=>{ const k=keyFor(r); if(seen.has(k)) return false; seen.add(k); return true; });
+      const removed = before - raw.length;
+      meta.textContent += ` • (deduped: -${removed})`;
+      refreshAll();
+    });
+
+    handleOut.addEventListener('click', ()=>{
+      if(!raw.length) return;
+      const action = outAction.value;
+      let flagged = 0, affected = 0;
+      // build numeric columns list
+      const numCols = columns.filter(c=> isMostlyNumeric(colValues(c)));
+      const bounds = {};
+      numCols.forEach(c=>{
+        const nums = colValues(c).filter(isNumeric).map(toNum).sort((a,b)=>a-b);
+        const q1 = quantile(nums,0.25), q3 = quantile(nums,0.75); const iqr = q3-q1; const lo=q1-1.5*iqr, hi=q3+1.5*iqr;
+        bounds[c] = [lo, hi];
+      });
+
+      if(action==='flag'){
+        outReport.innerHTML = 'Outliers flagged columns: '+ numCols.map(c=>`${c} [${fmt(bounds[c][0])}, ${fmt(bounds[c][1])}]`).join(', ');
+        return;
+      }
+
+      const within = (v,[lo,hi])=> (v>=lo && v<=hi);
+      const newRows = [];
+      for(const row of raw){
+        let keep = true; const nr = {...row};
+        for(const c of numCols){
+          const v = +row[c]; if(!isNumeric(v)) continue;
+          const b = bounds[c];
+          if(action==='clip'){
+            if(v<b[0]){ nr[c]=b[0]; affected++; }
+            else if(v>b[1]){ nr[c]=b[1]; affected++; }
+          } else if(action==='remove'){
+            if(!within(v,b)){ keep=false; flagged++; break; }
+          }
+        }
+        if(keep) newRows.push(nr);
+      }
+      if(action==='clip'){ raw = newRows; outReport.textContent = `Clipped ${affected} values across ${numCols.length} columns.`; }
+      if(action==='remove'){ const removed = raw.length - newRows.length; raw = newRows; outReport.textContent = `Removed ${removed} rows with outliers (flagged=${flagged}).`; }
+      refreshAll();
+    });
+
+    downloadCSV.addEventListener('click', ()=>{
+      if(!raw.length) return;
+      const rows = [columns.join(','), ...raw.map(r=> columns.map(c=> escapeCsv(r[c])).join(','))].join('
+');
+      const blob = new Blob([rows], {type:'text/csv'});
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'cleaned.csv'; a.click(); URL.revokeObjectURL(a.href);
+    });
+
+    function escapeCsv(v){ if(v==null) return ''; const s=String(v); if(/[",
+]/.test(s)) return '"'+s.replace(/"/g,'""')+'"'; return s; }
+
+    // Mini dashboard
+    function buildKPIs(){
+      if(!raw.length){ kpiRow.innerHTML=''; return; }
+      const totalRows = raw.length; const totalCols = columns.length;
+      let missing=0; raw.forEach(r=> columns.forEach(c=>{ if(r[c]===''||r[c]===null||r[c]===undefined) missing++; }));
+      const totalCells = totalRows*totalCols; const missPct = totalCells? (missing/totalCells*100):0;
+      // numeric columns summary: pick first numeric for quick KPI
+      const numCols = columns.filter(c=> isMostlyNumeric(colValues(c)));
+      const firstNum = numCols[0];
+      let avg = NaN; if(firstNum){ const ns = colValues(firstNum).filter(isNumeric).map(toNum); avg = mean(ns); }
+      kpiRow.innerHTML = '';
+      addKPI('Rows', totalRows.toLocaleString());
+      addKPI('Columns', totalCols.toLocaleString());
+      addKPI('% Missing', (missPct).toFixed(2)+'%');
+      addKPI(firstNum?`Avg(${firstNum})`:'Numeric Cols', firstNum? fmt(avg): numCols.length.toString());
+    }
+
+    function addKPI(label, value){
+      const div=document.createElement('div'); div.className='kpicard';
+      div.innerHTML = `<div class="kpit">${escapeHtml(label)}</div><div class="kpiv">${escapeHtml(value)}</div>`; kpiRow.appendChild(div);
+    }
+
+    dashPlot.addEventListener('click', ()=>{
+      if(!raw.length) return; if(dashChart) dashChart.destroy();
+      const xCol = dashX.value; const yCol = dashY.value;
+      const grouped = groupAgg(raw, xCol, yCol, 'sum');
+      dashChart = new Chart(dashCanvas, { type:'bar', data:{ labels: grouped.map(d=>d.key), datasets:[{ label: `${yCol} by ${xCol}`, data: grouped.map(d=>d.value) }] }, options:{ responsive:true, plugins:{ legend:{ display:false } }, scales:{ y:{ beginAtZero:true } } } });
+    });
+
+    function groupAgg(rows, xCol, yCol, how='sum'){
+      const m = new Map();
+      for(const r of rows){ const k = String(r[xCol]??''); const v = isNumeric(r[yCol])? +r[yCol] : NaN; if(!isNaN(v)){ m.set(k, (m.get(k)||0) + v); } }
+      return Array.from(m, ([key, value])=>({key, value}));
+    }
+
+    exportDash.addEventListener('click', ()=>{
+      const html = buildStandaloneDashboardHTML();
+      const blob = new Blob([html], {type:'text/html'});
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download='mini_dashboard.html'; a.click(); URL.revokeObjectURL(a.href);
+    });
+
+    function buildStandaloneDashboardHTML(){
+      const data = { columns, rows: raw };
+      const title = 'Mini Dashboard';
+      return `<!DOCTYPE html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>${title}</title>
+        <script src=\"https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js\"></script>
+        <style>body{font-family:system-ui, -apple-system, Segoe UI, Roboto; margin:24px; background:#0b1025; color:#e5e7eb} .wrap{max-width:1100px;margin:0 auto} h1{margin:0 0 6px} .card{background:#0b1226;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px;margin:10px 0} .kpi{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:10px} .kpicard{background:#0b132a;border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:12px} .kpit{color:#a5b4fc;font-size:12px} .kpiv{font-size:22px;font-weight:800}</style>
+        </head><body><div class=\"wrap\"><h1>${title}</h1><div class=\"card\" id=\"kpis\"></div><div class=\"card\"><canvas id=\"c\" height=\"260\"></canvas><div style=\"margin-top:8px\">X: <select id=\"x\"></select> Y (numeric): <select id=\"y\"></select> <button id=\"plot\">Plot</button></div></div></div>
+        <script>const data=${JSON.stringify(data)};const C=data.columns;const R=data.rows;const e=(id)=>document.getElementById(id);function isN(v){return v!==''&&v!=null&&!isNaN(+v)&&isFinite(+v)};function m(a){return a.reduce((x,y)=>x+y,0)/a.length};function q(a,p){if(!a.length)return NaN;const s=a.slice().sort((x,y)=>x-y);const pos=(s.length-1)*p;const b=Math.floor(pos),r=pos-b;return s[b]+(s[b+1]-s[b])*(r||0)};function addK(container,t,v){const d=document.createElement('div');d.className='kpicard';d.innerHTML='<div class=\"kpit\">'+t+'</div><div class=\"kpiv\">'+v+'</div>';container.appendChild(d);}const k=e('kpis'), kgrid=document.createElement('div');kgrid.className='kpi';k.appendChild(kgrid);const totalRows=R.length,totalCols=C.length;let miss=0;R.forEach(r=>C.forEach(c=>{if(r[c]===''||r[c]==null)miss++;}));const missPct=(totalRows*totalCols)?(miss/(totalRows*totalCols)*100).toFixed(2)+'%':'0%';const numCols=C.filter(c=>{const vals=R.map(r=>r[c]).filter(v=>v!==''&&v!=null);const n=vals.filter(isN).length;return vals.length&&(n/vals.length>0.8)});let first=numCols[0];let avg='n/a';if(first){const ns=R.map(r=>r[first]).filter(isN).map(Number);avg=(m(ns)).toFixed(2);}addK(kgrid,'Rows', totalRows.toLocaleString());addK(kgrid,'Columns', totalCols.toLocaleString());addK(kgrid,'% Missing', missPct);addK(kgrid, first?('Avg('+first+')'):'Numeric Cols', first?avg:String(numCols.length));const xs=e('x'), ys=e('y');xs.innerHTML=C.map(c=>'
+<option>'+c+'</option>').join('');ys.innerHTML=numCols.map(c=>'
+<option>'+c+'</option>').join('');let chart; e('plot').onclick=()=>{if(chart)chart.destroy();const x=xs.value,y=ys.value;const map=new Map();for(const r of R){const k=String(r[x]??'');const v=isN(r[y])?+r[y]:NaN;if(!isNaN(v))map.set(k,(map.get(k)||0)+v);}const labels=Array.from(map.keys());const vals=labels.map(k=>map.get(k));chart=new Chart(e('c').getContext('2d'),{type:'bar',data:{labels,datasets:[{label:y+' by '+x,data:vals}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});};</script></body></html>`;
+    }
+
+    function refreshAll(){
+      populatePreview();
+      buildProfiles();
+      fillColumnSelects();
+      buildKPIs();
+      chartBtn.disabled = !raw.length;
+      dashPlot.disabled = !raw.length;
+      exportDash.disabled = !raw.length;
+    }
+
+    function fmt(x){ if(x==null||Number.isNaN(x)) return '—'; const n=+x; return Math.abs(n)>=1000? n.toLocaleString(undefined,{maximumFractionDigits:2}) : n.toFixed(2); }
+
+    // Demo boot
+    window.addEventListener('DOMContentLoaded', ()=>{
+      const demoCSV = `age,gender,income,city
+23,M,42000,Miami
+35,F,68000,Boca Raton
+29,F,52000,Miami
+41,M,91000,Orlando
+33,M,57000,Miami
+28,F,61000,Tampa
+54,M,120000,Miami
+22,F,39000,Orlando
+38,F,74000,Tampa
+46,M,85000,Boca Raton`;
+      parseCSVText(demoCSV, 'demo.csv');
+    });
+  </script>
+</body>
+</html>
