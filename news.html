@@ -27,8 +27,8 @@
     .badge{display:inline-flex;align-items:center;padding:2px 8px;border:1px solid #2b3a77;border-radius:999px;background:#0d1530;color:#bcd0ff;font-size:.78rem}
     .empty{text-align:center;padding:26px 10px;color:var(--muted)}
     .hidden{display:none!important}
-    /* sources panel should not stretch with articles column */
-    aside.panel{max-height:80vh;overflow-y:auto;position:sticky;top:96px;align-self:flex-start}
+    /* sticky, independently scrolling sources panel */
+    aside.panel{max-height:80vh;overflow-y:auto;position:sticky;top:100px;align-self:flex-start}
   </style>
 </head>
 <body>
@@ -48,22 +48,22 @@
             <label class="chip"><input type="checkbox" class="cat" data-cat="science" checked> Science + Data Science</label>
             <label class="chip"><input type="checkbox" class="cat" data-cat="tech" checked> Tech</label>
             <input id="q" placeholder="Filter by keyword (e.g., quantum, fusion, LLM)" style="flex:1;min-width:240px"/>
-            <select id="sort">
-              <option value="new">Newest first</option>
-              <option value="old">Oldest first</option>
-              <option value="az">Title A→Z</option>
-            </select>
-            <select id="fresh">
+            <select id="freshness" title="Freshness window (days)">
               <option value="30">Last 30 days</option>
               <option value="90" selected>Last 90 days</option>
               <option value="180">Last 180 days</option>
               <option value="365">Last 365 days</option>
             </select>
+            <select id="sort" title="Sort order">
+              <option value="new">Newest first</option>
+              <option value="old">Oldest first</option>
+              <option value="az">Title A→Z</option>
+            </select>
             <button id="fetch" class="primary">Fetch</button>
             <button id="toggle-sources">Hide controls</button>
           </div>
         </div>
-        <div class="small" id="fresh-note" style="margin-top:6px;color:var(--muted)">Showing last 90 days only. Use keyword filter to narrow.</div>
+        <div class="small" style="margin-top:6px;color:var(--muted)">Showing headlines from the selected freshness window. Use keyword filter to narrow.</div>
       </div>
 
       <div id="count" class="small" style="margin:10px 0;color:var(--muted)">0 results</div>
@@ -108,7 +108,7 @@
           'Phys.org – Top News': 'https://phys.org/rss-feed/',
           // Data Science additions / fixed feeds
           'KDnuggets': 'https://www.kdnuggets.com/feed',
-          'Towards Data Science (tag feed)': 'https://medium.com/feed/tag/data-science',
+          'Towards Data Science (tag)': 'https://medium.com/feed/tag/data-science',
           'Analytics Vidhya': 'https://www.analyticsvidhya.com/blog/feed/',
           'DataTau': 'https://www.datatau.com/rss',
           'Kaggle Blog (mirror)': 'https://feeds.feedburner.com/kaggle-blog'
@@ -120,25 +120,24 @@
           'The Verge – Tech': 'https://www.theverge.com/tech/rss/index.xml',
           'Ars Technica': 'https://arstechnica.com/feed/',
           'Wired': 'https://www.wired.com/feed/rss',
-          'IEEE Spectrum': 'https://spectrum.ieee.org/rss' 
+          'IEEE Spectrum': 'https://spectrum.ieee.org/rss'
         }
       }
     };
 
-    // ---------------------- Helpers ----------------------
-    let FRESH_DAYS = 90;              // default freshness window
-    const PAGE_SIZE = 50;             // articles per page append
-    let ALL_ITEMS = [];               // merged + filtered
-    let VISIBLE = 0;                  // rendered count
+    // ---------------------- Helpers & state ----------------------
+    let MAX_AGE_DAYS = 90;
+    const PAGE_SIZE = 50;
+    let ALL_ITEMS = [];
+    let VISIBLE = 0;
     let LOADING_MORE = false;
 
-    const el = s=> document.querySelector(s);
-    const norm = d=>{ const t=Date.parse(d||''); return Number.isNaN(t)?0:t; };
-    const cutoff = ()=>{ const d=new Date(); d.setDate(d.getDate()-FRESH_DAYS); return d.getTime(); };
-    const isFresh = it=> norm(it.date) >= cutoff();
-
-    function fmtDate(d){ const t=norm(d); return t? new Date(t).toLocaleString():''; }
-    function setCount(n){ el('#count').textContent = `${n} result${n===1?'':'s'}`; }
+    const el = s => document.querySelector(s);
+    const norm = d => { const t = Date.parse(d || ''); return Number.isNaN(t) ? 0 : t; };
+    const cutoffTs = () => { const d = new Date(); d.setDate(d.getDate() - MAX_AGE_DAYS); return d.getTime(); };
+    const isFresh = it => norm(it.date) >= cutoffTs();
+    const fmtDate = d => { const t = norm(d); return t ? new Date(t).toLocaleString() : ''; };
+    const setCount = n => el('#count').textContent = `${n} result${n === 1 ? '' : 's'}`;
 
     function makeSourceList(){
       const box = el('#sources');
@@ -152,7 +151,7 @@
         box.appendChild(h);
         Object.entries(group.feeds).forEach(([name,url])=>{
           const lab = document.createElement('label');
-          lab.className = 'chip'; lab.style.display='inline-flex'; lab.style.userSelect='none';
+          lab.className = 'chip';
           lab.innerHTML = `<input type="checkbox" class="src" data-cat="${cat}" data-url="${url}" checked> ${name}`;
           box.appendChild(lab);
         });
@@ -163,31 +162,40 @@
       document.querySelectorAll('input.cat').forEach(cb=>{
         cb.addEventListener('change', ()=>{
           const cat = cb.getAttribute('data-cat');
-          document.querySelectorAll(`input.src[data-cat="${cat}"]`).forEach(scb=> scb.checked = cb.checked);
+          document.querySelectorAll(\`input.src[data-cat="\${cat}"]\`).forEach(scb=> scb.checked = cb.checked);
         });
       });
     }
 
     function selectAll(v){ document.querySelectorAll('input.src').forEach(cb=> cb.checked = v); }
 
-    // ---------------------- Fetching feeds w/ fallback proxy ----------------------
-    async function fetchAllOrigins(url){
-      const r = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
-      if(!r.ok) throw new Error('HTTP '+r.status);
-      const {contents=''} = await r.json();
-      return contents;
+    // ---------------------- Fetching with fallback ----------------------
+    async function fetchProxied(url){
+      // Try AllOrigins (raw XML)
+      try {
+        const r = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
+        const { contents = '' } = await r.json();
+        if (contents && contents.trim()) return contents;
+      } catch {}
+
+      // Fallback: rss2json (JSON → pseudo-RSS XML)
+      try {
+        const r2 = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}`);
+        if (!r2.ok) throw new Error('HTTP ' + r2.status);
+        const json = await r2.json();
+        const items = (json.items || []).map(item =>
+          `<item><title>${item.title || ''}</title><link>${item.link || item.guid || ''}</link><pubDate>${item.pubDate || item.published || item.updated || ''}</pubDate><description>${(item.description || item.content || '')}</description></item>`
+        ).join('');
+        return `<rss><channel>${items}</channel></rss>`;
+      } catch {}
+
+      return '';
     }
 
-    async function fetchRss2Json(url){
-      const r = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}`);
-      if(!r.ok) throw new Error('HTTP '+r.status);
-      return r.json();
-    }
-
-    function parseFeedXML(xml, source){
+    function parseFeed(xml, source){
       const doc = new DOMParser().parseFromString(xml, 'text/xml');
       const items = [...doc.querySelectorAll('item')];
-      const entries = items.length? items: [...doc.querySelectorAll('entry')];
+      const entries = items.length ? items : [...doc.querySelectorAll('entry')];
       return entries.map(n=>{
         const get = sel => n.querySelector(sel)?.textContent?.trim();
         const title = get('title') || '(untitled)';
@@ -198,112 +206,49 @@
       });
     }
 
-    function parseFeedRss2Json(json, source){
-      const items = json?.items || [];
-      return items.map(it=>({
-        title: it.title || '(untitled)',
-        link: it.link || it.guid || '',
-        date: it.pubDate || it.published || it.updated || '',
-        description: (it.description || it.content || '').toString(),
-        source
-      }));
-    }
-
-    async function fetchOneFeed(url, name){
-      try{
-        // try AllOrigins (raw XML)
-        const xml = await fetchAllOrigins(url);
-        const parsed = parseFeedXML(xml, name);
-        if(parsed && parsed.length) return parsed;
-      }catch{ /* fall through */ }
-      try{
-        // fallback: rss2json (returns JSON)
-        const js = await fetchRss2Json(url);
-        const parsed = parseFeedRss2Json(js, name);
-        return parsed;
-      }catch{ return []; }
-    }
-
-    async function loadSelectedFeedsIncremental() {
-    const enabled = [...document.querySelectorAll('input.src:checked')].map(x => ({
-      url: x.dataset.url,
-      cat: x.dataset.cat,
-      name: x.parentElement.textContent.trim()
-    }));
-    if (!enabled.length) { alert('Select at least one source.'); return []; }
-
-    // Reset UI before we start
-    ALL_ITEMS = [];
-    VISIBLE = 0;
-    document.querySelector('#results').innerHTML = '';
-    document.querySelector('#empty').classList.add('hidden');
-
-    // Render a tiny placeholder while first sources arrive
-    const placeholder = document.createElement('div');
-    placeholder.className = 'empty';
-    placeholder.textContent = 'Fetching…';
-    document.querySelector('#results').appendChild(placeholder);
-
-    const out = [];
-
-    await Promise.all(enabled.map(async ({ url, cat, name }) => {
-      try {
-        const xml = await fetchProxied(url);
-        const rows = xml ? parseFeed(xml, name).map(it => ({ ...it, cat })) : [];
-        out.push(...rows);
-
-      // Progressive update: re-filter/sort and append next batch if any
-        ALL_ITEMS = applyFiltersSort(out.slice());
-        if (placeholder.isConnected) placeholder.remove(); // remove once first results land
-        // If nothing has been shown yet, ensure the table is cleared
-        if (VISIBLE === 0) { document.querySelector('#results').innerHTML = ''; }
-
-        // Append until we've filled one "page" ahead of current scroll
-        if (VISIBLE < ALL_ITEMS.length) renderNextPage();
-      } catch {
-        // ignore this feed on error
-      }
-    }));
-
-    return out; // final merged list (already displayed incrementally)
-  }
-
     function applyFiltersSort(items){
       const kw = el('#q').value.trim().toLowerCase();
       const sort = el('#sort').value;
 
       let out = items.filter(isFresh);
-      if(kw){ out = out.filter(it=> (it.title+" "+(it.description||'')).toLowerCase().includes(kw)); }
+      if (kw) out = out.filter(it => (it.title + " " + (it.description || '')).toLowerCase().includes(kw));
 
       // dedupe by link/title
       const seen = new Set();
-      out = out.filter(it=>{ const key=(it.link||it.title||'').trim(); if(!key||seen.has(key)) return false; seen.add(key); return true; });
+      out = out.filter(it => {
+        const key = (it.link || it.title || '').trim();
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
 
-      if(sort==='new') out.sort((a,b)=> norm(b.date)-norm(a.date));
-      if(sort==='old') out.sort((a,b)=> norm(a.date)-norm(b.date));
-      if(sort==='az') out.sort((a,b)=> (a.title||'').localeCompare(b.title||''));
+      if (sort === 'new') out.sort((a,b)=> norm(b.date) - norm(a.date));
+      if (sort === 'old') out.sort((a,b)=> norm(a.date) - norm(b.date));
+      if (sort === 'az')  out.sort((a,b)=> (a.title || '').localeCompare(b.title || ''));
       return out;
     }
 
-    // ---------------------- Rendering w/ infinite scroll ----------------------
-    function clearResults(){ el('#results').innerHTML=''; VISIBLE=0; }
+    // ---------------------- Rendering & infinite scroll ----------------------
+    function clearResults(){ el('#results').innerHTML = ''; VISIBLE = 0; }
 
     function renderNextPage(){
       const container = el('#results');
       const end = Math.min(VISIBLE + PAGE_SIZE, ALL_ITEMS.length);
       const batch = ALL_ITEMS.slice(VISIBLE, end);
       const frag = document.createDocumentFragment();
+
       batch.forEach(it=>{
         const art = document.createElement('article');
         art.className = 'card';
-        art.innerHTML = `<div class=\"content\">
-            <div class=\"meta\"><span>${it.source||''}</span><span>${fmtDate(it.date)}</span></div>
-            <div class=\"title\"><a href=\"${it.link}\" target=\"_blank\" rel=\"noopener\">${it.title}</a></div>
-            ${it.description? `<p class=\"small\" style=\"opacity:.92;margin:6px 0\">${it.description.replace(/<[^>]+>/g,'').slice(0,240)}${it.description.length>240?'…':''}</p>`:''}
-            <div class=\"chips\"><span class=\"badge\">${it.cat||''}</span></div>
+        art.innerHTML = `<div class="content">
+            <div class="meta"><span>${it.source || ''}</span><span>${fmtDate(it.date)}</span></div>
+            <div class="title"><a href="${it.link}" target="_blank" rel="noopener">${it.title}</a></div>
+            ${it.description ? `<p class="small" style="opacity:.92;margin:6px 0">${it.description.replace(/<[^>]+>/g,'').slice(0,240)}${it.description.length>240?'…':''}</p>` : ''}
+            <div class="chips"><span class="badge">${it.cat || ''}</span></div>
           </div>`;
         frag.appendChild(art);
       });
+
       container.appendChild(frag);
       VISIBLE = end;
       setCount(ALL_ITEMS.length);
@@ -311,45 +256,79 @@
     }
 
     const sentinel = el('#infinite-sentinel');
-    function toggleSentinel(){ sentinel.style.display = VISIBLE>=ALL_ITEMS.length? 'none':'block'; }
+    function toggleSentinel(){ sentinel.style.display = VISIBLE >= ALL_ITEMS.length ? 'none' : 'block'; }
 
     const io = new IntersectionObserver(entries=>{
-      if(!entries[0].isIntersecting) return;
-      if(LOADING_MORE) return;
-      if(VISIBLE>=ALL_ITEMS.length) return;
+      if (!entries[0].isIntersecting) return;
+      if (LOADING_MORE) return;
+      if (VISIBLE >= ALL_ITEMS.length) return;
       LOADING_MORE = true;
-      requestAnimationFrame(()=>{ renderNextPage(); LOADING_MORE=false; });
+      requestAnimationFrame(()=>{ renderNextPage(); LOADING_MORE = false; });
     }, { rootMargin:'600px 0px 600px 0px' });
     io.observe(sentinel);
 
-    // ---------------------- Events ----------------------
-    async function runFetch(){
-      document.getElementById('empty').classList.add('hidden');
-      document.getElementById('results').innerHTML = '<div class="empty">Fetching…</div>';
+    // ---------------------- Incremental loading ----------------------
+    async function loadSelectedFeedsIncremental(){
+      const enabled = [...document.querySelectorAll('input.src:checked')].map(x=>({
+        url: x.dataset.url, cat: x.dataset.cat, name: x.parentElement.textContent.trim()
+      }));
+      if (!enabled.length) { alert('Select at least one source.'); return []; }
 
-    // This will progressively update the UI as each feed finishes:
-      const merged = await loadSelectedFeedsIncremental();
+      // reset UI and show placeholder
+      ALL_ITEMS = []; VISIBLE = 0; LOADING_MORE = false;
+      const resultsEl = el('#results');
+      el('#empty').classList.add('hidden');
+      resultsEl.innerHTML = '';
+      const placeholder = document.createElement('div');
+      placeholder.className = 'empty';
+      placeholder.textContent = 'Fetching…';
+      resultsEl.appendChild(placeholder);
 
-    // Safety: if after all feeds there’s still nothing, show empty state
-      ALL_ITEMS = applyFiltersSort(merged);
-      if (!ALL_ITEMS.length) {
-        document.getElementById('results').innerHTML = '';
-        document.getElementById('empty').classList.remove('hidden');
-        setCount(0);
-        return;
+      const out = [];
+
+      await Promise.all(enabled.map(async ({url,cat,name})=>{
+        try{
+          const xml = await fetchProxied(url);
+          const rows = xml ? parseFeed(xml, name).map(it => ({...it, cat})) : [];
+          out.push(...rows);
+
+          // Progressive update
+          ALL_ITEMS = applyFiltersSort(out.slice());
+          if (placeholder.isConnected) placeholder.remove();
+          if (VISIBLE === 0) resultsEl.innerHTML = '';
+          if (VISIBLE < ALL_ITEMS.length) renderNextPage();
+        }catch{/* ignore this feed on error */}
+      }));
+
+      return out;
     }
 
-  // If incremental already rendered, we’re done; ensure sentinel state is right
-  toggleSentinel();
-}
+    // ---------------------- Events ----------------------
+    async function runFetch(){
+      // sync freshness from UI
+      MAX_AGE_DAYS = parseInt(el('#freshness').value, 10) || 90;
 
+      // Incremental load (renders as each feed finishes)
+      const merged = await loadSelectedFeedsIncremental();
+
+      // Final safety: if nothing, show empty state
+      ALL_ITEMS = applyFiltersSort(merged);
+      if (!ALL_ITEMS.length) {
+        el('#results').innerHTML = '';
+        el('#empty').classList.remove('hidden');
+        setCount(0);
+        return;
+      }
+      toggleSentinel();
+    }
+
+    // UI event bindings
     document.getElementById('fetch').addEventListener('click', runFetch);
     document.getElementById('q').addEventListener('keydown', e=>{ if(e.key==='Enter') runFetch(); });
-    document.getElementById('sort').addEventListener('change', ()=>{ ALL_ITEMS = applyFiltersSort(ALL_ITEMS); clearResults(); renderNextPage(); });
-    document.getElementById('fresh').addEventListener('change', (e)=>{
-      FRESH_DAYS = parseInt(e.target.value,10)||90;
-      el('#fresh-note').textContent = `Showing last ${FRESH_DAYS} days only. Use keyword filter to narrow.`;
-      if(ALL_ITEMS.length){ ALL_ITEMS = applyFiltersSort(ALL_ITEMS); clearResults(); renderNextPage(); }
+    document.getElementById('sort').addEventListener('change', ()=>{
+      ALL_ITEMS = applyFiltersSort(ALL_ITEMS);
+      clearResults();
+      if (ALL_ITEMS.length) renderNextPage();
     });
     document.getElementById('select-all').addEventListener('click', ()=> selectAll(true));
     document.getElementById('deselect-all').addEventListener('click', ()=> selectAll(false));
@@ -357,7 +336,7 @@
       const aside = document.querySelector('aside.panel');
       const btn = document.getElementById('toggle-sources');
       const hidden = aside.classList.toggle('hidden');
-      btn.textContent = hidden? 'Show controls':'Hide controls';
+      btn.textContent = hidden ? 'Show controls' : 'Hide controls';
     });
 
     // init
