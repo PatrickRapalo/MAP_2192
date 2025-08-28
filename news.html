@@ -1,418 +1,288 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Tech & Science News – Pick Your Feeds</title>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Latest Tech & Science Headlines — Infinite Scroll</title>
   <style>
-    :root {
-      --bg: #0b1020;
-      --panel: #12182b;
-      --panel-2: #0f1527;
-      --text: #e7ecff;
-      --muted: #9fb0ffcc;
-      --accent: #7aa2ff;
-      --chip: #1b2340;
-      --card: #0f1527;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
-      background: linear-gradient(180deg, var(--bg), #070a14 40%);
-      color: var(--text);
-    }
-    header {
-      position: sticky; top: 0; z-index: 5;
-      background: linear-gradient(180deg, rgba(7,10,20,.95), rgba(7,10,20,.75));
-      backdrop-filter: blur(6px);
-      border-bottom: 1px solid #1f2746;
-    }
-    .container { max-width: 1100px; margin: 0 auto; padding: 18px 18px; }
-    h1 { font-size: 1.35rem; margin: 0 0 10px; letter-spacing:.2px }
-    .controls { display: grid; gap: 10px; grid-template-columns: 1fr; align-items: start; }
-    @media (min-width: 800px){ .controls{ grid-template-columns: 2.2fr 1fr; } }
-    .panel { background: var(--panel); border: 1px solid #20294a; border-radius: 14px; padding: 12px; }
-    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-    .search { display:flex; gap:8px; }
-    input[type="text"] { flex:1; padding:10px 12px; border-radius:10px; border:1px solid #223160; background:#0a0f21; color:var(--text) }
-    select, button { padding:10px 12px; border-radius:10px; border:1px solid #223160; background:#0a0f21; color:var(--text); cursor:pointer }
-    button.primary { background: linear-gradient(180deg,#2a3c7d,#24356d); border-color:#2d3f80 }
-    .chips { display:flex; gap:8px; flex-wrap: wrap; }
-    .chip { display:inline-flex; align-items:center; gap:6px; padding: 8px 10px; border-radius:999px; background: var(--chip); border:1px solid #23315f; font-size:.92rem }
-    .chip input { accent-color: var(--accent); }
-    .hint{ color: var(--muted); font-size:.9rem }
-    .stats { color: var(--muted); font-size:.9rem; }
-    .grid { display:grid; grid-template-columns: 1fr; gap: 14px; margin-top: 14px }
-    @media (min-width: 700px){ .grid{ grid-template-columns: 1fr 1fr; } }
-    @media (min-width: 1024px){ .grid{ grid-template-columns: 1fr 1fr 1fr; } }
-    .card { background: var(--card); border:1px solid #1c2546; border-radius: 16px; overflow:hidden; display:flex; flex-direction: column; min-height: 100px }
-    .thumb { width:100%; height: 160px; object-fit: cover; background:#0b0f1f }
-    .content { padding: 12px }
-    .meta { display:flex; justify-content: space-between; align-items:center; gap:8px; color: var(--muted); font-size:.85rem; margin-bottom:6px }
-    .title a { color: var(--text); text-decoration: none; font-weight: 600 }
-    .title a:hover { text-decoration: underline }
-    .desc { color: #cdd6ff; font-size:.95rem }
-    .footer { display:flex; justify-content: space-between; align-items:center; gap:8px; margin-top:auto; padding: 12px; border-top:1px solid #1a2240; color: var(--muted); font-size:.85rem }
-    .empty { text-align:center; padding: 40px 10px; color: var(--muted) }
-    .hidden{display:none !important}
-    .fab{position:fixed; right:14px; bottom:14px; z-index:20;}
-    /* Make the sources list scroll inside the panel */
-    #sources-panel { max-height: 70vh; overflow: auto; -webkit-overflow-scrolling: touch; }
+    :root{--bg:#0c1022;--panel:#121831;--card:#0f162c;--text:#e9ecff;--muted:#a9b7ffcc;--chip:#1a2344;--accent:#7aa2ff}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:linear-gradient(180deg,var(--bg),#090f1e 45%);color:var(--text)}
+    header{position:sticky;top:0;z-index:10;background:linear-gradient(180deg,rgba(9,15,30,.95),rgba(9,15,30,.75));backdrop-filter:blur(6px);border-bottom:1px solid #1f2b55}
+    .container{max-width:1200px;margin:0 auto;padding:16px}
+    h1{font-size:1.35rem;margin:0}
+    .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .panel{background:var(--panel);border:1px solid #1b2550;border-radius:14px;padding:12px}
+    input,select,button{padding:10px 12px;border-radius:10px;border:1px solid #233160;background:#0a0f21;color:var(--text)}
+    button.primary{background:linear-gradient(180deg,#2a3c7d,#24356d);border-color:#2d3f80;cursor:pointer}
+    .chips{display:flex;gap:8px;flex-wrap:wrap}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border-radius:999px;background:var(--chip);border:1px solid #23315f;font-size:.92rem}
+    .grid{display:grid;gap:14px}
+    @media(min-width:980px){.grid-2{grid-template-columns:2fr 1fr}}
+    .card{background:var(--card);border:1px solid #1b254e;border-radius:16px;overflow:hidden}
+    .content{padding:14px}
+    .title a{color:var(--text);text-decoration:none;font-weight:700}
+    .title a:hover{text-decoration:underline}
+    .meta{display:flex;justify-content:space-between;gap:10px;color:var(--muted);font-size:.86rem;margin-bottom:6px}
+    .badge{display:inline-flex;align-items:center;padding:2px 8px;border:1px solid #2b3a77;border-radius:999px;background:#0d1530;color:#bcd0ff;font-size:.78rem}
+    .empty{text-align:center;padding:26px 10px;color:var(--muted)}
+    .hidden{display:none!important}
+    /* right column list scrolls independently on tall pages */
+    #sources{max-height:70vh;overflow:auto;-webkit-overflow-scrolling:touch}
   </style>
 </head>
 <body>
   <header>
     <div class="container">
-      <div style="display:flex;justify-content:space-between;gap:12px;align-items:center">
-        <h1>Latest Tech & Science Headlines</h1>
-        <button id="toggle-controls" class="primary" style="white-space:nowrap">▲ Hide controls</button>
-      </div>
-
-      <!-- CONTROLS -->
-      <div id="controls-wrap" class="controls">
-        <div class="panel">
-          <div class="row" style="justify-content:space-between; align-items: start">
-            <div>
-              <div class="hint">Choose categories (you can toggle sources inside each)</div>
-              <div class="chips" id="category-chips"></div>
-            </div>
-            <div class="search">
-              <input id="q" type="text" placeholder="Filter by keyword (e.g., 'quantum', 'LLM', 'NASA')"/>
-              <select id="sort">
-                <option value="new">Newest first</option>
-                <option value="old">Oldest first</option>
-                <option value="az">Title A→Z</option>
-              </select>
-              <button class="primary" id="refresh">Fetch</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="panel" id="sources-panel">
-          <div class="row" style="justify-content: space-between; align-items:center">
-            <strong>Sources</strong>
-            <div class="row" style="gap:8px; align-items:center">
-              <button id="btn-select-all" class="chip" title="Enable all sources">Select all</button>
-              <button id="btn-deselect-all" class="chip" title="Disable all sources">Deselect all</button>
-              <div class="stats"><span id="count">0</span> items</div>
-            </div>
-          </div>
-          <div class="hint" style="margin:6px 0 10px">Toggle which feeds to include. Add/remove URLs below in the code if you want to customize.</div>
-          <div id="sources"></div>
-        </div>
-      </div>
-      <!-- /CONTROLS -->
+      <h1>Latest Tech & Science Headlines</h1>
     </div>
   </header>
 
-  <main class="container">
-    <div class="grid" id="grid"></div>
-    <div class="empty" id="empty" style="display:none">No stories matched your filters. Try a different category, sources, or keyword.</div>
+  <main class="container grid grid-2" style="margin-top:12px">
+    <!-- LEFT: controls + results -->
+    <section>
+      <div class="panel">
+        <div class="row" style="align-items:flex-start;justify-content:space-between">
+          <div class="row" style="flex:1;gap:10px">
+            <label class="chip"><input type="checkbox" class="cat" data-cat="ai" checked> AI</label>
+            <label class="chip"><input type="checkbox" class="cat" data-cat="science" checked> Science + Data Science</label>
+            <label class="chip"><input type="checkbox" class="cat" data-cat="tech" checked> Tech</label>
+            <input id="q" placeholder="Filter by keyword (e.g., quantum, fusion, LLM)" style="flex:1;min-width:240px"/>
+            <select id="sort">
+              <option value="new">Newest first</option>
+              <option value="old">Oldest first</option>
+              <option value="az">Title A→Z</option>
+            </select>
+            <button id="fetch" class="primary">Fetch</button>
+            <button id="toggle-sources">Hide controls</button>
+          </div>
+        </div>
+        <div class="small" style="margin-top:6px;color:var(--muted)">Showing last 90 days only. Use keyword filter to narrow.</div>
+      </div>
+
+      <div id="count" class="small" style="margin:10px 0;color:var(--muted)">0 results</div>
+
+      <div id="results" class="grid"></div>
+      <div id="empty" class="empty">No results yet. Click <em>Fetch</em> to load headlines.</div>
+      <div id="infinite-sentinel" style="height:2px"></div>
+    </section>
+
+    <!-- RIGHT: sources -->
+    <aside class="panel">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <strong>Sources</strong>
+        <div class="row">
+          <button id="select-all" class="chip">Select all</button>
+          <button id="deselect-all" class="chip">Deselect all</button>
+        </div>
+      </div>
+      <div id="sources" style="margin-top:8px"></div>
+      <div class="small" style="margin-top:8px;color:var(--muted)">Tip: toggle categories above to quickly include/exclude whole groups.</div>
+    </aside>
   </main>
-  <button class="primary fab" id="fab" title="Show/Hide filters">Filters</button>
 
   <script>
-    // --- Feed catalog -------------------------------------------------------
-    const FEEDS = {
-      AI: { feeds: [
-        { name: 'OpenAI Blog', url: 'https://openai.com/blog/rss.xml' },
-        { name: 'Google AI Blog', url: 'https://ai.googleblog.com/atom.xml' },
-        { name: 'Meta AI', url: 'https://ai.facebook.com/blog/rss/' },
-        { name: 'ArXiv AI (cs.AI)', url: 'https://arxiv.org/rss/cs.AI' },
-        { name: 'MIT News – AI', url: 'https://news.mit.edu/rss/topic/artificial-intelligence2' },
-        { name: 'VentureBeat AI', url: 'https://venturebeat.com/category/ai/feed/' },
-      ]},
-      Science: { feeds: [
-        { name: 'NASA Breaking News', url: 'https://www.nasa.gov/news-release/feed/' },
-        { name: 'Nature – News', url: 'https://www.nature.com/subjects/science/news.rss' },
-        { name: 'ScienceDaily – Top Science', url: 'https://www.sciencedaily.com/rss/top/science.xml' },
-        { name: 'NOAA News', url: 'https://www.noaa.gov/news-features/feed' },
-        { name: 'Phys.org – Top News', url: 'https://phys.org/rss-feed/' },
-      ]},
-      Tech: { feeds: [
-        { name: 'TechCrunch', url: 'https://techcrunch.com/feed/' },
-        { name: 'The Verge – Tech', url: 'https://www.theverge.com/tech/rss/index.xml' },
-        { name: 'Ars Technica', url: 'https://feeds.arstechnica.com/arstechnica/index/' },
-        { name: 'Wired', url: 'https://www.wired.com/feed/rss' },
-        { name: 'IEEE Spectrum', url: 'https://spectrum.ieee.org/feed' },
-      ]},
-      Cybersecurity: { feeds: [
-        { name: 'The Hacker News', url: 'https://thehackernews.com/feeds/posts/default' },
-        { name: 'Krebs on Security', url: 'https://krebsonsecurity.com/feed/' },
-        { name: 'BleepingComputer', url: 'https://www.bleepingcomputer.com/feed/' },
-        { name: 'Schneier on Security', url: 'https://www.schneier.com/feed/atom/' },
-      ]},
-      Gadgets: { feeds: [
-        { name: 'Engadget', url: 'https://www.engadget.com/rss.xml' },
-        { name: 'Gizmodo', url: 'https://gizmodo.com/rss' },
-        { name: 'The Verge – Gadgets', url: 'https://www.theverge.com/rss/gadgets/index.xml' },
-      ]},
-      'Dev & Open Source': { feeds: [
-        { name: 'Hacker News – Front Page', url: 'https://hnrss.org/frontpage' },
-        { name: 'GitHub Blog', url: 'https://github.blog/feed/' },
-        { name: 'Stack Overflow Blog', url: 'https://stackoverflow.blog/feed/' },
-      ]},
-      Hardware: { feeds: [
-        { name: 'AnandTech', url: 'https://www.anandtech.com/rss' },
-        { name: "Tom's Hardware", url: 'https://www.tomshardware.com/feeds/all' },
-        { name: 'IEEE Spectrum – Semiconductors', url: 'https://spectrum.ieee.org/semiconductors/rss' },
-      ]},
+    // ---------------------- Config: sources by category (RSS/Atom) ----------------------
+    const CATALOG = {
+      ai: {
+        label: 'AI', color: '#7aa2ff', feeds: {
+          'OpenAI Blog': 'https://openai.com/blog/rss.xml',
+          'Google AI Blog': 'https://ai.googleblog.com/atom.xml',
+          'ArXiv cs.AI (recent)': 'https://export.arxiv.org/rss/cs.AI',
+          'MIT News – AI': 'http://news.mit.edu/topic/artificial-intelligence2-rss.xml',
+          'VentureBeat AI': 'https://venturebeat.com/category/ai/feed/'
+        }
+      },
+      science: {
+        label: 'Science + Data Science', color: '#98e6a6', feeds: {
+          'NASA Breaking News': 'https://www.nasa.gov/rss/dyn/breaking_news.rss',
+          'Nature – News': 'https://www.nature.com/nature/articles?type=news.rss',
+          'ScienceDaily – Top Science': 'https://www.sciencedaily.com/rss/top/science.xml',
+          'NOAA News': 'https://www.noaa.gov/rss.xml',
+          'Phys.org – Top News': 'https://phys.org/rss-feed/',
+          // Data Science additions
+          'KDnuggets': 'https://www.kdnuggets.com/feed',
+          'Towards Data Science': 'https://towardsdatascience.com/feed',
+          'Analytics Vidhya': 'https://www.analyticsvidhya.com/blog/feed/',
+          'DataTau': 'https://www.datatau.com/rss',
+          'Kaggle Blog': 'https://www.kaggle.com/blog.rss'
+        }
+      },
+      tech: {
+        label: 'Tech', color: '#f3c17a', feeds: {
+          'TechCrunch': 'https://techcrunch.com/feed/',
+          'The Verge – Tech': 'https://www.theverge.com/tech/rss/index.xml',
+          'Ars Technica': 'https://arstechnica.com/feed/',
+          'Wired': 'https://www.wired.com/feed/rss',
+          'IEEE Spectrum': 'https://spectrum.ieee.org/rss' 
+        }
+      }
     };
 
-    // --- State --------------------------------------------------------------
-    const state = {
-      categories: new Set(Object.keys(FEEDS)),
-      enabledFeeds: new Set(),
-      items: [],
-      showControls: true,
-    };
+    // ---------------------- Helpers ----------------------
+    const PAGE_SIZE = 50;              // articles per page append
+    const MAX_AGE_DAYS = 90;           // 3 months
+    let ALL_ITEMS = [];                // merged + filtered
+    let VISIBLE = 0;                   // rendered count
+    let LOADING_MORE = false;
 
-    // --- Helpers ------------------------------------------------------------
-    const el = (sel) => document.querySelector(sel);
-    const escapeHTML = (str='') => str.replace(/[&<>]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[s]));
-    const normalizeDate = (d) => { const t = Date.parse(d); return isNaN(t) ? 0 : t; };
+    const cutoffTs = (()=>{const d=new Date(); d.setDate(d.getDate()-MAX_AGE_DAYS); return d.getTime();})();
+    const norm = d=>{ const t=Date.parse(d||''); return Number.isNaN(t)?0:t; };
+    const isFresh = it=> norm(it.date) >= cutoffTs;
 
-    function formatDate(d){
-      try{ return new Date(d).toLocaleString(undefined,{dateStyle:'medium', timeStyle:'short'}); }catch{ return d; }
+    const el = s=> document.querySelector(s);
+
+    function fmtDate(d){ const t=norm(d); return t? new Date(t).toLocaleString():''; }
+
+    function setCount(n){ el('#count').textContent = `${n} result${n===1?'':'s'}`; }
+
+    function makeSourceList(){
+      const box = el('#sources');
+      box.innerHTML = '';
+      Object.entries(CATALOG).forEach(([cat, group])=>{
+        const h = document.createElement('div');
+        h.innerHTML = `<div class="row" style="justify-content:space-between;align-items:center;margin:6px 0">
+            <span class="badge" style="border-color:${group.color};">${group.label}</span>
+            <label class="chip"><input type="checkbox" class="cat" data-cat="${cat}" checked> include</label>
+          </div>`;
+        box.appendChild(h);
+        Object.entries(group.feeds).forEach(([name,url])=>{
+          const lab = document.createElement('label');
+          lab.className = 'chip'; lab.style.display='inline-flex'; lab.style.userSelect='none';
+          lab.innerHTML = `<input type="checkbox" class="src" data-cat="${cat}" data-url="${url}" checked> ${name}`;
+          box.appendChild(lab);
+        });
+      });
     }
 
-    function firstImageFrom(node){
-      const media = node.querySelector('media\\:content, content, enclosure');
-      if (media && media.getAttribute('url')) return media.getAttribute('url');
-      const desc = node.querySelector('description, summary');
-      if (desc){
-        const tmp = document.createElement('div');
-        tmp.innerHTML = desc.textContent;
-        const img = tmp.querySelector('img');
-        if (img && img.src) return img.src;
-      }
-      return '';
+    function setCatTogglesFromHeader(){
+      // When header category chips are toggled, sync checkboxes for feeds of that category
+      document.querySelectorAll('input.cat').forEach(cb=>{
+        cb.addEventListener('change', ()=>{
+          const cat = cb.getAttribute('data-cat');
+          document.querySelectorAll(`input.src[data-cat="${cat}"]`).forEach(scb=> scb.checked = cb.checked);
+        });
+      });
     }
 
-    function parseRSS(xmlText, fallbackSource){
-      const doc = new DOMParser().parseFromString(xmlText, 'text/xml');
-      const isRSS = doc.querySelector('rss, RDF, rdf\\:RDF');
-      const isAtom = doc.querySelector('feed');
-      const out = [];
-      if (isRSS){
-        doc.querySelectorAll('item').forEach(item => {
-          out.push({
-            title: item.querySelector('title')?.textContent?.trim() || 'Untitled',
-            link: item.querySelector('link')?.textContent?.trim() || '#',
-            date: item.querySelector('pubDate')?.textContent || item.querySelector('dc\\:date')?.textContent || '',
-            source: doc.querySelector('channel > title')?.textContent?.trim() || fallbackSource,
-            desc: item.querySelector('description')?.textContent || '',
-            image: firstImageFrom(item)
-          });
-        });
-      } else if (isAtom){
-        doc.querySelectorAll('entry').forEach(entry => {
-          const linkEl = entry.querySelector('link[rel="alternate"]') || entry.querySelector('link');
-          out.push({
-            title: entry.querySelector('title')?.textContent?.trim() || 'Untitled',
-            link: linkEl?.getAttribute('href') || '#',
-            date: entry.querySelector('updated')?.textContent || entry.querySelector('published')?.textContent || '',
-            source: doc.querySelector('feed > title')?.textContent?.trim() || fallbackSource,
-            desc: entry.querySelector('summary')?.textContent || entry.querySelector('content')?.textContent || '',
-            image: firstImageFrom(entry)
-          });
-        });
-      }
+    function selectAll(v){ document.querySelectorAll('input.src').forEach(cb=> cb.checked = v); }
+
+    // ---------------------- Fetching feeds ----------------------
+    async function fetchProxied(url){
+      const r = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      const {contents=''} = await r.json();
+      return contents;
+    }
+
+    function parseFeed(xml, source){
+      const doc = new DOMParser().parseFromString(xml, 'text/xml');
+      const items = [...doc.querySelectorAll('item')]; // RSS
+      const entries = items.length? items: [...doc.querySelectorAll('entry')]; // Atom fallback
+      return entries.map(n=>{
+        const get = sel => n.querySelector(sel)?.textContent?.trim();
+        const title = get('title') || '(untitled)';
+        const link = n.querySelector('link')?.getAttribute('href') || get('link');
+        const date = get('pubDate') || get('published') || get('updated') || get('dc\:date');
+        const desc = get('description') || get('summary') || '';
+        return { title, link, date, description: desc, source };
+      });
+    }
+
+    async function loadSelectedFeeds(){
+      const enabled = [...document.querySelectorAll('input.src:checked')].map(x=>({url:x.dataset.url, cat:x.dataset.cat, name:x.parentElement.textContent.trim()}));
+      if(!enabled.length){ alert('Select at least one source.'); return []; }
+      const tasks = enabled.map(async({url,cat,name})=>{
+        try{
+          const xml = await fetchProxied(url);
+          const items = parseFeed(xml, name).map(it=> ({...it, cat}));
+          return items;
+        }catch(e){ return []; }
+      });
+      const parts = await Promise.all(tasks);
+      return parts.flat();
+    }
+
+    function applyFiltersSort(items){
+      const kw = el('#q').value.trim().toLowerCase();
+      const sort = el('#sort').value;
+
+      let out = items.filter(isFresh);
+      if(kw){ out = out.filter(it=> (it.title+" "+(it.description||'')).toLowerCase().includes(kw)); }
+
+      // dedupe by link/title
+      const seen = new Set();
+      out = out.filter(it=>{ const key=(it.link||it.title||'').trim(); if(!key||seen.has(key)) return false; seen.add(key); return true; });
+
+      if(sort==='new') out.sort((a,b)=> norm(b.date)-norm(a.date));
+      if(sort==='old') out.sort((a,b)=> norm(a.date)-norm(b.date));
+      if(sort==='az') out.sort((a,b)=> (a.title||'').localeCompare(b.title||''));
       return out;
     }
 
-    async function fetchFeed(url){
-      const proxied = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-      const res = await fetch(proxied);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      return data.contents;
-    }
+    // ---------------------- Rendering w/ infinite scroll ----------------------
+    function clearResults(){ el('#results').innerHTML=''; VISIBLE=0; }
 
-    // --- Renderers ----------------------------------------------------------
-    function renderSources(){
-      const sourcesEl = el('#sources');
-      sourcesEl.innerHTML = '';
-      Object.entries(FEEDS).forEach(([cat, obj]) => {
-        const group = document.createElement('div');
-        group.style.marginBottom = '10px';
-        const h = document.createElement('div');
-        h.innerHTML = `<strong>${cat}</strong>`;
-        group.appendChild(h);
-        const list = document.createElement('div');
-        list.className = 'chips';
-        obj.feeds.forEach(f => {
-          const id = `${cat}::${f.name}`;
-          const wrap = document.createElement('label');
-          wrap.className = 'chip';
-          wrap.innerHTML = `<input type="checkbox" ${state.enabledFeeds.has(id)?'checked':''}/> <span>${escapeHTML(f.name)}</span>`;
-          const checkbox = wrap.querySelector('input');
-          checkbox.addEventListener('change', () => {
-            if (checkbox.checked) state.enabledFeeds.add(id); else state.enabledFeeds.delete(id);
-          });
-          list.appendChild(wrap);
-        });
-        group.appendChild(list);
-        sourcesEl.appendChild(group);
-      });
-
-      // Attach select/deselect events
-      const sel = document.getElementById('btn-select-all');
-      const desel = document.getElementById('btn-deselect-all');
-      if (sel) sel.onclick = ()=> setAllSources(true);
-      if (desel) desel.onclick = ()=> setAllSources(false);
-    }
-
-    function renderCategoryChips(){
-      const chips = el('#category-chips');
-      chips.innerHTML = '';
-      Object.keys(FEEDS).forEach(cat => {
-        const lab = document.createElement('label');
-        lab.className = 'chip';
-        lab.innerHTML = `<input type="checkbox" ${state.categories.has(cat)?'checked':''}/> <span>${cat}</span>`;
-        const cb = lab.querySelector('input');
-        cb.addEventListener('change', ()=>{
-          if(cb.checked) state.categories.add(cat); else state.categories.delete(cat);
-        });
-        chips.appendChild(lab);
-      });
-    }
-
-    function renderItems(items){
-      const grid = el('#grid');
-      const empty = el('#empty');
-      grid.innerHTML = '';
-      el('#count').textContent = items.length;
-      if (!items.length){ empty.style.display='block'; return; }
-      empty.style.display='none';
+    function renderNextPage(){
+      const container = el('#results');
+      const end = Math.min(VISIBLE + PAGE_SIZE, ALL_ITEMS.length);
+      const batch = ALL_ITEMS.slice(VISIBLE, end);
       const frag = document.createDocumentFragment();
-      items.forEach(it => {
-        const card = document.createElement('article');
-        card.className = 'card';
-        if (it.image){
-          const img = document.createElement('img');
-          img.className = 'thumb';
-          img.loading = 'lazy';
-          img.alt = '';
-          img.src = it.image;
-          card.appendChild(img);
-        }
-        const content = document.createElement('div');
-        content.className = 'content';
-        const meta = document.createElement('div');
-        meta.className = 'meta';
-        meta.innerHTML = `<span>${escapeHTML(it.source)}</span><span>${escapeHTML(formatDate(it.date))}</span>`;
-        const title = document.createElement('div');
-        title.className = 'title';
-        title.innerHTML = `<a href="${it.link}" target="_blank" rel="noopener">${escapeHTML(it.title)}</a>`;
-        const desc = document.createElement('div');
-        desc.className = 'desc';
-        desc.textContent = it.desc.replace(/<[^>]+>/g,'').slice(0,220) + (it.desc.length>220?'…':'');
-        content.appendChild(meta);
-        content.appendChild(title);
-        content.appendChild(desc);
-        card.appendChild(content);
-        const footer = document.createElement('div');
-        footer.className = 'footer';
-        footer.innerHTML = `<span>Source feed</span><span>↗</span>`;
-        card.appendChild(footer);
-        frag.appendChild(card);
+      batch.forEach(it=>{
+        const art = document.createElement('article');
+        art.className = 'card';
+        art.innerHTML = `<div class="content">
+            <div class="meta"><span>${it.source||''}</span><span>${fmtDate(it.date)}</span></div>
+            <div class="title"><a href="${it.link}" target="_blank" rel="noopener">${it.title}</a></div>
+            ${it.description? `<p class="small" style="opacity:.92;margin:6px 0">${it.description.replace(/<[^>]+>/g,'').slice(0,240)}${it.description.length>240?'…':''}</p>`:''}
+            <div class="chips"><span class="badge">${it.cat||''}</span></div>
+          </div>`;
+        frag.appendChild(art);
       });
-      grid.appendChild(frag);
+      container.appendChild(frag);
+      VISIBLE = end;
+      setCount(ALL_ITEMS.length);
+      toggleSentinel();
     }
 
-    // --- Filter/sort --------------------------------------------------------
-    function applyFiltersSort(items){
-      const q = el('#q').value.trim().toLowerCase();
-      const sort = el('#sort').value;
-      let out = items;
-      if (q){
-        out = out.filter(it => (it.title+" "+it.desc+" "+it.source).toLowerCase().includes(q));
-      }
-      if (sort === 'new') out.sort((a,b)=> normalizeDate(b.date) - normalizeDate(a.date));
-      if (sort === 'old') out.sort((a,b)=> normalizeDate(a.date) - normalizeDate(b.date));
-      if (sort === 'az') out.sort((a,b)=> a.title.localeCompare(b.title));
-      return out.slice(0, 60);
+    const sentinel = el('#infinite-sentinel');
+    function toggleSentinel(){ sentinel.style.display = VISIBLE>=ALL_ITEMS.length? 'none':'block'; }
+
+    const io = new IntersectionObserver(entries=>{
+      if(!entries[0].isIntersecting) return;
+      if(LOADING_MORE) return;
+      if(VISIBLE>=ALL_ITEMS.length) return;
+      LOADING_MORE = true;
+      requestAnimationFrame(()=>{ renderNextPage(); LOADING_MORE=false; });
+    }, { rootMargin:'600px 0px 600px 0px' });
+    io.observe(sentinel);
+
+    // ---------------------- Events ----------------------
+    async function runFetch(){
+      el('#empty').classList.add('hidden');
+      el('#results').innerHTML = '<div class="empty">Fetching…</div>';
+      const merged = await loadSelectedFeeds();
+      ALL_ITEMS = applyFiltersSort(merged);
+      clearResults();
+      if(!ALL_ITEMS.length){ el('#results').innerHTML=''; el('#empty').classList.remove('hidden'); setCount(0); return; }
+      renderNextPage();
     }
 
-    async function gatherSelectedFeeds(){
-      const selected = [];
-      Object.entries(FEEDS).forEach(([cat, obj]) => {
-        if (!state.categories.has(cat)) return;
-        obj.feeds.forEach(f => {
-          const id = `${cat}::${f.name}`;
-          if (state.enabledFeeds.has(id)) selected.push({cat, ...f});
-        });
-      });
-      return selected;
-    }
+    document.getElementById('fetch').addEventListener('click', runFetch);
+    document.getElementById('q').addEventListener('keydown', e=>{ if(e.key==='Enter') runFetch(); });
+    document.getElementById('sort').addEventListener('change', ()=>{ ALL_ITEMS = applyFiltersSort(ALL_ITEMS); clearResults(); renderNextPage(); });
+    document.getElementById('select-all').addEventListener('click', ()=> selectAll(true));
+    document.getElementById('deselect-all').addEventListener('click', ()=> selectAll(false));
+    document.getElementById('toggle-sources').addEventListener('click', ()=>{
+      const aside = document.querySelector('aside.panel');
+      const btn = document.getElementById('toggle-sources');
+      const hidden = aside.classList.toggle('hidden');
+      btn.textContent = hidden? 'Show controls':'Hide controls';
+    });
 
-    async function fetchAll(){
-      const grid = el('#grid');
-      grid.innerHTML = '<div class="empty">Fetching feeds…</div>';
-      try {
-        const selected = await gatherSelectedFeeds();
-        const results = await Promise.allSettled(selected.map(async src => {
-          const xml = await fetchFeed(src.url);
-          const items = parseRSS(xml, src.name).map(i=>({ ...i, category: src.cat }));
-          return items;
-        }));
-        const merged = results.flatMap(r => r.status==='fulfilled' ? r.value : []);
-        state.items = merged;
-        renderItems(applyFiltersSort(merged));
-        // Auto-hide controls and reset search after fetching
-        const qEl = el('#q'); if (qEl) qEl.value = '';
-        setControls(false);
-        const main = document.querySelector('main'); if (main) main.scrollIntoView({behavior:'smooth'});
-      } catch (e){
-        console.error(e);
-        el('#grid').innerHTML = '<div class="empty">Failed to fetch one or more feeds. Try again.</div>';
-      }
-    }
-
-    // --- Controls & bulk select --------------------------------------------
-    function setControls(show){
-      state.showControls = !!show;
-      const wrap = document.getElementById('controls-wrap');
-      if (wrap) wrap.classList.toggle('hidden', !state.showControls);
-      const btn = document.getElementById('toggle-controls');
-      if (btn) btn.textContent = state.showControls ? '▲ Hide controls' : '▼ Show controls';
-      if (state.showControls){
-        const sp = document.getElementById('sources-panel');
-        if (sp){ sp.scrollTop = 0; sp.focus?.(); }
-        document.querySelector('header')?.scrollIntoView({behavior:'smooth', block:'start'});
-      }
-    }
-
-    function setAllSources(checked){
-      Object.entries(FEEDS).forEach(([cat, obj]) => {
-        obj.feeds.forEach(f => {
-          const id = `${cat}::${f.name}`;
-          if (checked) state.enabledFeeds.add(id); else state.enabledFeeds.delete(id);
-        });
-      });
-      document.querySelectorAll('#sources input[type="checkbox"]').forEach(cb => cb.checked = checked);
-    }
-
-    // --- Init ---------------------------------------------------------------
-    (function init(){
-      // enable everything by default
-      Object.entries(FEEDS).forEach(([cat, obj]) => {
-        obj.feeds.forEach(f => state.enabledFeeds.add(`${cat}::${f.name}`));
-      });
-
-      renderCategoryChips();
-      renderSources();
-
-      el('#refresh').addEventListener('click', ()=>{ setControls(false); fetchAll(); });
-      el('#q').addEventListener('input', ()=> renderItems(applyFiltersSort(state.items)) );
-      el('#sort').addEventListener('change', ()=> renderItems(applyFiltersSort(state.items)) );
-      el('#toggle-controls').addEventListener('click', ()=> setControls(!state.showControls));
-      const fabBtn = document.getElementById('fab'); if (fabBtn) fabBtn.addEventListener('click', ()=> setControls(!state.showControls));
-
-      // First fetch
-      fetchAll();
-    })();
+    // init
+    makeSourceList();
+    setCatTogglesFromHeader();
   </script>
 </body>
 </html>
