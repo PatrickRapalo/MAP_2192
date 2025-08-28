@@ -29,6 +29,10 @@
     .hidden{display:none!important}
     /* sources panel should not stretch with articles column */
     aside.panel{max-height:80vh;overflow-y:auto;position:sticky;top:96px;align-self:flex-start}
+    /* skeletons */
+    .skeleton{height:120px;border-radius:16px;background:#0e1531;border:1px solid #1b254e;position:relative;overflow:hidden}
+    .skeleton::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.06),transparent);animation:shimmer 1.1s infinite}
+    @keyframes shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
   </style>
 </head>
 <body>
@@ -106,7 +110,6 @@
           'ScienceDaily – Top Science': 'https://www.sciencedaily.com/rss/top/science.xml',
           'NOAA News': 'https://www.noaa.gov/rss.xml',
           'Phys.org – Top News': 'https://phys.org/rss-feed/',
-          // Data Science additions / fixed feeds
           'KDnuggets': 'https://www.kdnuggets.com/feed',
           'Towards Data Science (tag feed)': 'https://medium.com/feed/tag/data-science',
           'Analytics Vidhya': 'https://www.analyticsvidhya.com/blog/feed/',
@@ -120,7 +123,7 @@
           'The Verge – Tech': 'https://www.theverge.com/tech/rss/index.xml',
           'Ars Technica': 'https://arstechnica.com/feed/',
           'Wired': 'https://www.wired.com/feed/rss',
-          'IEEE Spectrum': 'https://spectrum.ieee.org/rss' 
+          'IEEE Spectrum': 'https://spectrum.ieee.org/rss'
         }
       }
     };
@@ -131,6 +134,14 @@
     let ALL_ITEMS = [];               // merged + filtered
     let VISIBLE = 0;                  // rendered count
     let LOADING_MORE = false;
+
+    // Incremental run state
+    let RUN = 0;                      // monotonic run id for cancelation
+    const SEEN_KEYS = new Set();      // dedupe across feeds
+    let PENDING_TO_RENDER = [];       // buffer to batch DOM inserts
+    let IS_STREAMING = false;
+    const INSERT_BATCH = 10;
+    let renderDrainScheduled = false;
 
     const el = s=> document.querySelector(s);
     const norm = d=>{ const t=Date.parse(d||''); return Number.isNaN(t)?0:t; };
@@ -211,48 +222,114 @@
 
     async function fetchOneFeed(url, name){
       try{
-        // try AllOrigins (raw XML)
         const xml = await fetchAllOrigins(url);
         const parsed = parseFeedXML(xml, name);
         if(parsed && parsed.length) return parsed;
-      }catch{ /* fall through */ }
+      }catch{}
       try{
-        // fallback: rss2json (returns JSON)
         const js = await fetchRss2Json(url);
         const parsed = parseFeedRss2Json(js, name);
         return parsed;
       }catch{ return []; }
     }
 
-    async function loadSelectedFeeds(){
-      const enabled = [...document.querySelectorAll('input.src:checked')].map(x=>({url:x.dataset.url, cat:x.dataset.cat, name:x.parentElement.textContent.trim()}));
-      if(!enabled.length){ alert('Select at least one source.'); return []; }
-      const tasks = enabled.map(async({url,cat,name})=>{
-        const items = await fetchOneFeed(url, name);
-        return items.map(it=> ({...it, cat}));
-      });
-      const parts = await Promise.all(tasks);
-      return parts.flat();
+    // ---------------------- Incremental rendering ----------------------
+    function queueRender(items){
+      hideSkeletons();
+      PENDING_TO_RENDER.push(...items);
+      if (!renderDrainScheduled) {
+        renderDrainScheduled = true;
+        requestAnimationFrame(drainRenderQueue);
+      }
     }
 
-    function applyFiltersSort(items){
-      const kw = el('#q').value.trim().toLowerCase();
-      const sort = el('#sort').value;
+    function drainRenderQueue(){
+      renderDrainScheduled = false;
+      const container = el('#results');
+      const frag = document.createDocumentFragment();
+      let count = 0;
 
-      let out = items.filter(isFresh);
-      if(kw){ out = out.filter(it=> (it.title+" "+(it.description||'')).toLowerCase().includes(kw)); }
+      while (PENDING_TO_RENDER.length && count < INSERT_BATCH){
+        const it = PENDING_TO_RENDER.shift();
+        const art = document.createElement('article');
+        art.className = 'card';
+        art.innerHTML = `<div class="content">
+            <div class="meta"><span>${it.source||''}</span><span>${fmtDate(it.date)}</span></div>
+            <div class="title"><a href="${it.link}" target="_blank" rel="noopener">${it.title}</a></div>
+            ${it.description? `<p class="small" style="opacity:.92;margin:6px 0">${it.description.replace(/<[^>]+>/g,'').slice(0,240)}${it.description.length>240?'…':''}</p>`:''}
+            <div class="chips"><span class="badge">${it.cat||''}</span></div>
+          </div>`;
+        frag.appendChild(art);
+        count++;
+        VISIBLE++;
+      }
+      container.appendChild(frag);
 
-      // dedupe by link/title
-      const seen = new Set();
-      out = out.filter(it=>{ const key=(it.link||it.title||'').trim(); if(!key||seen.has(key)) return false; seen.add(key); return true; });
+      if (PENDING_TO_RENDER.length){
+        requestAnimationFrame(drainRenderQueue);
+      } else {
+        toggleSentinel();
+      }
+    }
 
-      if(sort==='new') out.sort((a,b)=> norm(b.date)-norm(a.date));
-      if(sort==='old') out.sort((a,b)=> norm(a.date)-norm(b.date));
-      if(sort==='az') out.sort((a,b)=> (a.title||'').localeCompare(b.title||''));
+    // ---------------------- Concurrency helper ----------------------
+    async function poolMap(concurrency, tasks, worker){
+      const out = [];
+      let i = 0;
+      await Promise.all(Array.from({length: concurrency}, async () => {
+        while (i < tasks.length){
+          const idx = i++;
+          out[idx] = await worker(tasks[idx], idx);
+        }
+      }));
       return out;
     }
 
-    // ---------------------- Rendering w/ infinite scroll ----------------------
+    // ---------------------- NEW incremental loader ----------------------
+    async function loadSelectedFeedsIncremental(activeRun){
+      const enabled = [...document.querySelectorAll('input.src:checked')]
+        .map(x => ({ url: x.dataset.url, cat: x.dataset.cat, name: x.parentElement.textContent.trim() }));
+
+      if (!enabled.length){ alert('Select at least one source.'); return; }
+
+      SEEN_KEYS.clear();
+
+      await poolMap(4, enabled, async ({url, cat, name}) => {
+        if (RUN !== activeRun) return;
+        let items = await fetchOneFeed(url, name);
+        if (RUN !== activeRun) return;
+
+        items = items.map(it => ({ ...it, cat })).filter(isFresh);
+
+        const kw = el('#q').value.trim().toLowerCase();
+        if (kw){
+          items = items.filter(it => (it.title + " " + (it.description||'')).toLowerCase().includes(kw));
+        }
+
+        const fresh = [];
+        for (const it of items){
+          const key = (it.link||it.title||'').trim();
+          if (!key || SEEN_KEYS.has(key)) continue;
+          SEEN_KEYS.add(key);
+          fresh.push(it);
+        }
+
+        const sort = el('#sort').value;
+        if (sort==='new') fresh.sort((a,b)=> norm(b.date)-norm(a.date));
+        if (sort==='old') fresh.sort((a,b)=> norm(a.date)-norm(b.date));
+        if (sort==='az')  fresh.sort((a,b)=> (a.title||'').localeCompare(b.title||''));
+
+        ALL_ITEMS.push(...fresh);
+        if (sort==='new') ALL_ITEMS.sort((a,b)=> norm(b.date)-norm(a.date));
+        if (sort==='old') ALL_ITEMS.sort((a,b)=> norm(a.date)-norm(b.date));
+        if (sort==='az')  ALL_ITEMS.sort((a,b)=> (a.title||'').localeCompare(b.title||''));
+
+        setCount(ALL_ITEMS.length);
+        queueRender(fresh);
+      });
+    }
+
+    // ---------------------- Your existing infinite scroll (kept) ----------------------
     function clearResults(){ el('#results').innerHTML=''; VISIBLE=0; }
 
     function renderNextPage(){
@@ -263,11 +340,11 @@
       batch.forEach(it=>{
         const art = document.createElement('article');
         art.className = 'card';
-        art.innerHTML = `<div class=\"content\">
-            <div class=\"meta\"><span>${it.source||''}</span><span>${fmtDate(it.date)}</span></div>
-            <div class=\"title\"><a href=\"${it.link}\" target=\"_blank\" rel=\"noopener\">${it.title}</a></div>
-            ${it.description? `<p class=\"small\" style=\"opacity:.92;margin:6px 0\">${it.description.replace(/<[^>]+>/g,'').slice(0,240)}${it.description.length>240?'…':''}</p>`:''}
-            <div class=\"chips\"><span class=\"badge\">${it.cat||''}</span></div>
+        art.innerHTML = `<div class="content">
+            <div class="meta"><span>${it.source||''}</span><span>${fmtDate(it.date)}</span></div>
+            <div class="title"><a href="${it.link}" target="_blank" rel="noopener">${it.title}</a></div>
+            ${it.description? `<p class="small" style="opacity:.92;margin:6px 0">${it.description.replace(/<[^>]+>/g,'').slice(0,240)}${it.description.length>240?'…':''}</p>`:''}
+            <div class="chips"><span class="badge">${it.cat||''}</span></div>
           </div>`;
         frag.appendChild(art);
       });
@@ -289,25 +366,72 @@
     }, { rootMargin:'600px 0px 600px 0px' });
     io.observe(sentinel);
 
+    // ---------------------- Skeletons ----------------------
+    function showSkeletons(n=8){
+      const r = el('#results');
+      r.innerHTML = '';
+      const frag = document.createDocumentFragment();
+      for(let i=0;i<n;i++){ const d=document.createElement('div'); d.className='skeleton'; frag.appendChild(d); }
+      r.appendChild(frag);
+    }
+    function hideSkeletons(){
+      el('#results').querySelectorAll('.skeleton').forEach(n=>n.remove());
+    }
+
     // ---------------------- Events ----------------------
     async function runFetch(){
+      // cancel any previous run
+      RUN++; const myRun = RUN;
+      IS_STREAMING = true;
+      PENDING_TO_RENDER = [];
+      VISIBLE = 0;
+      ALL_ITEMS = [];
+      setCount(0);
       el('#empty').classList.add('hidden');
-      el('#results').innerHTML = '<div class="empty">Fetching…</div>';
-      const merged = await loadSelectedFeeds();
-      ALL_ITEMS = applyFiltersSort(merged);
-      clearResults();
-      if(!ALL_ITEMS.length){ el('#results').innerHTML=''; el('#empty').classList.remove('hidden'); setCount(0); return; }
-      renderNextPage();
+      showSkeletons(10);
+      toggleSentinel();
+
+      // slight delay so skeletons paint
+      await new Promise(r => setTimeout(r, 30));
+      if (RUN !== myRun) return;
+
+      try{
+        await loadSelectedFeedsIncremental(myRun);
+      }catch(e){
+        if (RUN !== myRun) return;
+        console.error(e);
+        el('#results').innerHTML = '<div class="empty">Error fetching some feeds. Try again.</div>';
+      }finally{
+        if (RUN !== myRun) return;
+        IS_STREAMING = false;
+        hideSkeletons();
+        if (!ALL_ITEMS.length){
+          el('#results').innerHTML = '';
+          el('#empty').classList.remove('hidden');
+        }
+      }
     }
 
     document.getElementById('fetch').addEventListener('click', runFetch);
     document.getElementById('q').addEventListener('keydown', e=>{ if(e.key==='Enter') runFetch(); });
-    document.getElementById('sort').addEventListener('change', ()=>{ ALL_ITEMS = applyFiltersSort(ALL_ITEMS); clearResults(); renderNextPage(); });
+
+    document.getElementById('sort').addEventListener('change', ()=>{
+      if (ALL_ITEMS.length){
+        const sort = el('#sort').value;
+        if (sort==='new') ALL_ITEMS.sort((a,b)=> norm(b.date)-norm(a.date));
+        if (sort==='old') ALL_ITEMS.sort((a,b)=> norm(a.date)-norm(b.date));
+        if (sort==='az')  ALL_ITEMS.sort((a,b)=> (a.title||'').localeCompare(b.title||''));
+        // Optional: clear + full re-render; disabled to avoid reordering already-visible cards
+        // clearResults(); renderNextPage();
+      }
+    });
+
     document.getElementById('fresh').addEventListener('change', (e)=>{
       FRESH_DAYS = parseInt(e.target.value,10)||90;
       el('#fresh-note').textContent = `Showing last ${FRESH_DAYS} days only. Use keyword filter to narrow.`;
-      if(ALL_ITEMS.length){ ALL_ITEMS = applyFiltersSort(ALL_ITEMS); clearResults(); renderNextPage(); }
+      runFetch(); // re-run to apply freshness at source
     });
+
     document.getElementById('select-all').addEventListener('click', ()=> selectAll(true));
     document.getElementById('deselect-all').addEventListener('click', ()=> selectAll(false));
     document.getElementById('toggle-sources').addEventListener('click', ()=>{
