@@ -1,0 +1,181 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Box Finder (OCR)</title>
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; background:#0b1020; color:#eaf; }
+    header { padding: 12px 16px; position: sticky; top: 0; background: #0b1020e6; backdrop-filter: blur(4px); }
+    #wrap { display: grid; grid-template-columns: 1fr 320px; gap: 12px; padding: 12px; }
+    #view { position: relative; width: 100%; max-height: 80vh; }
+    video, canvas { width: 100%; height: auto; display: block; border-radius: 8px; }
+    #overlay { position: absolute; top: 0; left: 0; pointer-events: none; }
+    label, input, button, select { font-size: 14px; }
+    .pill { display:inline-block; padding:6px 10px; border:1px solid #3a4; border-radius:999px; margin-right:8px }
+    .muted { color:#a9b; font-size:12px }
+    #status { margin-left: 8px }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>Box Finder</strong>
+    <span id="status" class="muted">loading OCR…</span>
+  </header>
+
+  <div id="wrap">
+    <div id="view">
+      <video id="video" autoplay playsinline></video>
+      <canvas id="overlay"></canvas>
+    </div>
+
+    <aside>
+      <div class="pill">Live OCR</div>
+      <div style="margin:12px 0">
+        <label>Target text (box #): </label>
+        <input id="query" value="6539" size="10" />
+        <button id="snap">Recognize now</button>
+      </div>
+      <div>
+        <label>Refresh rate: </label>
+        <select id="rate">
+          <option value="1500">Every 1.5s</option>
+          <option value="1000" selected>Every 1s</option>
+          <option value="500">Every 0.5s</option>
+          <option value="0">Manual only</option>
+        </select>
+      </div>
+      <p class="muted">
+        Tip: Good lighting, hold steady, and keep labels upright if possible.
+      </p>
+      <p class="muted">
+        Works best for digits; you can enter any word/number (e.g., “B”, “6547”, etc.).
+      </p>
+    </aside>
+  </div>
+
+  <!-- Tesseract.js (WASM OCR) -->
+  <script src="https://unpkg.com/tesseract.js@5.1.0/dist/tesseract.min.js"></script>
+  <script>
+    const video = document.getElementById('video');
+    const overlay = document.getElementById('overlay');
+    const ctx = overlay.getContext('2d');
+    const statusEl = document.getElementById('status');
+    const queryEl = document.getElementById('query');
+    const rateEl  = document.getElementById('rate');
+    const snapBtn = document.getElementById('snap');
+
+    let worker, timer=null, busy=false;
+
+    async function initCamera() {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' }, audio: false
+      });
+      video.srcObject = stream;
+      await video.play();
+      sizeCanvas();
+      window.addEventListener('resize', sizeCanvas);
+    }
+
+    function sizeCanvas() {
+      overlay.width  = video.videoWidth  || video.clientWidth;
+      overlay.height = video.videoHeight || video.clientHeight;
+    }
+
+    async function initOCR() {
+      worker = await Tesseract.createWorker('eng', 1, {
+        logger: m => (statusEl.textContent = m.status + (m.progress ? ` ${(m.progress*100|0)}%` : ''))
+      });
+      // Restrict to digits + uppercase letters to reduce false hits
+      await worker.setParameters({
+        tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-'
+      });
+      statusEl.textContent = 'ready';
+    }
+
+    function scheduleLoop() {
+      if (timer) clearInterval(timer);
+      const interval = +rateEl.value;
+      if (interval > 0) {
+        timer = setInterval(() => recognizeFrame(), interval);
+      }
+    }
+
+    async function recognizeFrame() {
+      if (busy || !worker) return;
+      busy = true;
+
+      // Draw current frame to a temp canvas (downscale for speed)
+      const scale = 0.8; // tweak for speed/accuracy
+      const w = Math.floor(overlay.width  * scale);
+      const h = Math.floor(overlay.height * scale);
+
+      const tmp = document.createElement('canvas');
+      tmp.width = w; tmp.height = h;
+      const tctx = tmp.getContext('2d', { willReadFrequently: true });
+
+      // Preprocessing: convert to grayscale & increase contrast
+      tctx.drawImage(video, 0, 0, w, h);
+      const img = tctx.getImageData(0, 0, w, h);
+      const data = img.data;
+      for (let i=0; i<data.length; i+=4) {
+        const g = (data[i]*0.3 + data[i+1]*0.59 + data[i+2]*0.11)|0;
+        const c = Math.min(255, Math.max(0, (g-128)*1.2 + 128)); // slight contrast bump
+        data[i]=data[i+1]=data[i+2]=c;
+      }
+      tctx.putImageData(img, 0, 0);
+
+      statusEl.textContent = 'recognizing…';
+      const { data: result } = await worker.recognize(tmp);
+
+      drawBoxes(result);
+      statusEl.textContent = 'ready';
+      busy = false;
+    }
+
+    function drawBoxes(result) {
+      const q = queryEl.value.trim().toUpperCase();
+      ctx.clearRect(0,0,overlay.width, overlay.height);
+
+      if (!q) return;
+      const matches = [];
+
+      // Look at word-level boxes for speed and stability
+      for (const w of result.words || []) {
+        const text = (w.text || '').toUpperCase();
+        if (text.includes(q)) {
+          matches.push(w.bbox);
+        }
+      }
+
+      // Draw
+      ctx.lineWidth = 4;
+      ctx.font = '20px system-ui';
+      ctx.strokeStyle = '#4cff4c';
+      ctx.fillStyle = 'rgba(76,255,76,0.2)';
+
+      const s = 1 / 0.8; // invert the earlier scale
+      for (const b of matches) {
+        const x = b.x0 * s, y = b.y0 * s, w = (b.x1-b.x0)*s, h = (b.y1-b.y0)*s;
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeRect(x, y, w, h);
+      }
+
+      if (matches.length) {
+        ctx.fillStyle = '#eaf';
+        ctx.fillText(`Found "${q}" (${matches.length})`, 12, 28);
+      }
+    }
+
+    // UI bindings
+    snapBtn.onclick = recognizeFrame;
+    rateEl.onchange = scheduleLoop;
+    queryEl.onchange = () => { /* immediate re-run for new query */ recognizeFrame(); };
+
+    (async () => {
+      await initCamera();
+      await initOCR();
+      scheduleLoop();
+    })();
+  </script>
+</body>
+</html>
