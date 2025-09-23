@@ -1,1 +1,15 @@
 Notes for Class
+
+
+##9/23/2025
+# Using Gamma and Claude for presentation generation
+
+RecycleVision
+
+I want to work on a visual AI classification model which can detect E-WASTE products such as smartphones, televisions, circuit borads, and small household appliances.
+
+Ask claude to explaing the problem and cost of E-Waste.
+
+Ask for it to give a pitch deck which can be the input of the gamma AI which can generate a presentation. This can help escalate my project quickly.
+
+https://wasteiq-smart-e-waste-de-yxjqdrd.gamma.site/
