@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AlexNet Mathematics</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.0/es5/tex-mml-chtml.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        nav {
+            background: #f7fafc;
+            padding: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        
+        .nav-btn {
+            padding: 12px 24px;
+            background: white;
+            border: 2px solid #667eea;
+            color: #667eea;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .nav-btn:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .nav-btn.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .section {
+            display: none;
+            animation: fadeIn 0.5s;
+        }
+        
+        .section.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .math-card {
+            background: #f8f9fa;
+            padding: 25px;
+            margin: 20px 0;
+            border-radius: 12px;
+            border-left: 5px solid #667eea;
+        }
+        
+        .math-card h3 {
+            color: #2d3748;
+            margin-bottom: 15px;
+            font-size: 1.4em;
+        }
+        
+        .formula {
+            background: white;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            overflow-x: auto;
+        }
+        
+        .example {
+            background: #e6fffa;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 8px;
+            border-left: 4px solid #38b2ac;
+        }
+        
+        .example h4 {
+            color: #234e52;
+            margin-bottom: 10px;
+        }
+        
+        .note {
+            background: #fef5e7;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 8px;
+            border-left: 4px solid #f39c12;
+        }
+        
+        .calculator {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 12px;
+            border: 2px solid #667eea;
+        }
+        
+        .calculator input {
+            padding: 10px;
+            margin: 5px;
+            border: 2px solid #e2e8f0;
+            border-radius: 6px;
+            width: 100px;
+            font-size: 1em;
+        }
+        
+        .calculator button {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            margin: 5px;
+        }
+        
+        .calculator button:hover {
+            background: #5568d3;
+        }
+        
+        .result {
+            background: #e6ffed;
+            padding: 15px;
+            margin-top: 10px;
+            border-radius: 6px;
+            font-weight: 600;
+            color: #22543d;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        th {
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+        }
+        
+        tr:hover {
+            background: #f7fafc;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🧮 AlexNet Mathematics</h1>
+            <p>Understanding the mathematical operations behind the revolutionary CNN</p>
+        </header>
+        
+        <nav>
+            <button class="nav-btn active" onclick="showSection('convolution')">Convolution</button>
+            <button class="nav-btn" onclick="showSection('pooling')">Pooling</button>
+            <button class="nav-btn" onclick="showSection('activation')">Activation Functions</button>
+            <button class="nav-btn" onclick="showSection('normalization')">Normalization</button>
+            <button class="nav-btn" onclick="showSection('dropout')">Dropout</button>
+            <button class="nav-btn" onclick="showSection('backprop')">Backpropagation</button>
+        </nav>
+        
+        <div class="content">
+            <!-- CONVOLUTION SECTION -->
+            <div id="convolution" class="section active">
+                <h2>🔷 Convolution Operation</h2>
+                
+                <div class="math-card">
+                    <h3>Basic Convolution Formula</h3>
+                    <div class="formula">
+                        $$ (I * K)(i,j) = \sum_{m}\sum_{n} I(i+m, j+n) \cdot K(m,n) $$
+                    </div>
+                    <p>Where <strong>I</strong> is the input image, <strong>K</strong> is the kernel (filter), and we slide the kernel across the input to produce a feature map.</p>
+                </div>
+                
+                <div class="math-card">
+                    <h3>Output Dimensions After Convolution</h3>
+                    <div class="formula">
+                        $$ H_{out} = \left\lfloor \frac{H_{in} + 2P - K_h}{S} \right\rfloor + 1 $$
+                        $$ W_{out} = \left\lfloor \frac{W_{in} + 2P - K_w}{S} \right\rfloor + 1 $$
+                    </div>
+                    <p>Where:</p>
+                    <ul style="margin-left: 20px; margin-top: 10px;">
+                        <li><strong>H<sub>in</sub>, W<sub>in</sub></strong>: Input height and width</li>
+                        <li><strong>P</strong>: Padding</li>
+                        <li><strong>K<sub>h</sub>, K<sub>w</sub></strong>: Kernel height and width</li>
+                        <li><strong>S</strong>: Stride</li>
+                    </ul>
+                </div>
+                
+                <div class="example">
+                    <h4>📊 Example: AlexNet Layer 1</h4>
+                    <p><strong>Input:</strong> 227×227×3 image</p>
+                    <p><strong>Kernel:</strong> 96 filters of size 11×11×3</p>
+                    <p><strong>Stride:</strong> 4, <strong>Padding:</strong> 0</p>
+                    <div class="formula">
+                        $$ H_{out} = \left\lfloor \frac{227 - 11}{4} \right\rfloor + 1 = 55 $$
+                        $$ W_{out} = \left\lfloor \frac{227 - 11}{4} \right\rfloor + 1 = 55 $$
+                    </div>
+                    <p><strong>Output:</strong> 55×55×96 feature maps</p>
+                </div>
+                
+                <div class="calculator">
+                    <h4>🧮 Convolution Output Calculator</h4>
+                    <div>
+                        <input type="number" id="conv_h" placeholder="Height" value="227">
+                        <input type="number" id="conv_w" placeholder="Width" value="227">
+                        <input type="number" id="conv_k" placeholder="Kernel" value="11">
+                        <input type="number" id="conv_s" placeholder="Stride" value="4">
+                        <input type="number" id="conv_p" placeholder="Padding" value="0">
+                        <button onclick="calculateConv()">Calculate</button>
+                    </div>
+                    <div id="conv_result" class="result" style="display:none;"></div>
+                </div>
+                
+                <div class="math-card">
+                    <h3>Number of Parameters in Convolutional Layer</h3>
+                    <div class="formula">
+                        $$ \text{Parameters} = (K_h \times K_w \times C_{in} + 1) \times N_{filters} $$
+                    </div>
+                    <p>Where <strong>C<sub>in</sub></strong> is the number of input channels and <strong>+1</strong> accounts for the bias term.</p>
+                </div>
+            </div>
+            
+            <!-- POOLING SECTION -->
+            <div id="pooling" class="section">
+                <h2>🔷 Pooling Operations</h2>
+                
+                <div class="math-card">
+                    <h3>Max Pooling Formula</h3>
+                    <div class="formula">
+                        $$ y(i,j) = \max_{m,n \in R} x(i \cdot S + m, j \cdot S + n) $$
+                    </div>
+                    <p>Where <strong>R</strong> is the pooling region (e.g., 3×3 window), and <strong>S</strong> is the stride.</p>
+                </div>
+                
+                <div class="math-card">
+                    <h3>Output Dimensions After Pooling</h3>
+                    <div class="formula">
+                        $$ H_{out} = \left\lfloor \frac{H_{in} - K_h}{S} \right\rfloor + 1 $$
+                        $$ W_{out} = \left\lfloor \frac{W_{in} - K_w}{S} \right\rfloor + 1 $$
+                    </div>
+                </div>
+                
+                <div class="example">
+                    <h4>📊 Example: AlexNet Layer 1 Pooling</h4>
+                    <p><strong>Input:</strong> 55×55×96 (after convolution)</p>
+                    <p><strong>Pooling:</strong> 3×3 window with stride 2</p>
+                    <div class="formula">
+                        $$ H_{out} = \left\lfloor \frac{55 - 3}{2} \right\rfloor + 1 = 27 $$
+                    </div>
+                    <p><strong>Output:</strong> 27×27×96</p>
+                </div>
+                
+                <div class="calculator">
+                    <h4>🧮 Pooling Output Calculator</h4>
+                    <div>
+                        <input type="number" id="pool_h" placeholder="Height" value="55">
+                        <input type="number" id="pool_w" placeholder="Width" value="55">
+                        <input type="number" id="pool_k" placeholder="Pool Size" value="3">
+                        <input type="number" id="pool_s" placeholder="Stride" value="2">
+                        <button onclick="calculatePool()">Calculate</button>
+                    </div>
+                    <div id="pool_result" class="result" style="display:none;"></div>
+                </div>
+                
+                <div class="note">
+                    <strong>Note:</strong> AlexNet uses overlapping pooling (pool size > stride), which helps reduce overfitting and improves accuracy.
+                </div>
+            </div>
+            
+            <!-- ACTIVATION FUNCTIONS SECTION -->
+            <div id="activation" class="section">
+                <h2>🔷 Activation Functions</h2>
+                
+                <div class="math-card">
+                    <h3>ReLU (Rectified Linear Unit)</h3>
+                    <div class="formula">
+                        $$ f(x) = \max(0, x) = \begin{cases} x & \text{if } x > 0 \\ 0 & \text{if } x \leq 0 \end{cases} $$
+                    </div>
+                    <p><strong>Derivative:</strong></p>
+                    <div class="formula">
+                        $$ f'(x) = \begin{cases} 1 & \text{if } x > 0 \\ 0 & \text{if } x \leq 0 \end{cases} $$
+                    </div>
+                </div>
+                
+                <div class="example">
+                    <h4>Why ReLU?</h4>
+                    <p>✅ <strong>Faster training:</strong> Simple computation, no expensive exponentials</p>
+                    <p>✅ <strong>Mitigates vanishing gradient:</strong> Gradient is either 0 or 1</p>
+                    <p>✅ <strong>Sparse activation:</strong> Only positive values pass through</p>
+                    <p>⚠️ <strong>Dying ReLU problem:</strong> Neurons can permanently output 0</p>
+                </div>
+                
+                <div class="math-card">
+                    <h3>Softmax (Output Layer)</h3>
+                    <div class="formula">
+                        $$ \sigma(z)_j = \frac{e^{z_j}}{\sum_{k=1}^{K} e^{z_k}} $$
+                    </div>
+                    <p>For <strong>j = 1, ..., K</strong> classes. Converts raw scores (logits) into probabilities that sum to 1.</p>
+                </div>
+                
+                <div class="calculator">
+                    <h4>🧮 ReLU Calculator</h4>
+                    <div>
+                        <input type="number" id="relu_input" placeholder="Enter value" value="-3.5" step="0.1">
+                        <button onclick="calculateReLU()">Apply ReLU</button>
+                    </div>
+                    <div id="relu_result" class="result" style="display:none;"></div>
+                </div>
+            </div>
+            
+            <!-- NORMALIZATION SECTION -->
+            <div id="normalization" class="section">
+                <h2>🔷 Local Response Normalization (LRN)</h2>
+                
+                <div class="math-card">
+                    <h3>LRN Formula</h3>
+                    <div class="formula">
+                        $$ b_{x,y}^i = \frac{a_{x,y}^i}{\left(k + \alpha \sum_{j=\max(0, i-n/2)}^{\min(N-1, i+n/2)} (a_{x,y}^j)^2\right)^\beta} $$
+                    </div>
+                    <p>Where:</p>
+                    <ul style="margin-left: 20px; margin-top: 10px;">
+                        <li><strong>a<sub>x,y</sub><sup>i</sup></strong>: Activity of neuron at position (x,y) in feature map i (after ReLU)</li>
+                        <li><strong>b<sub>x,y</sub><sup>i</sup></strong>: Normalized activity</li>
+                        <li><strong>n</strong>: Number of adjacent feature maps (AlexNet uses 5)</li>
+                        <li><strong>N</strong>: Total number of feature maps</li>
+                    </ul>
+                </div>
+                
+                <div class="math-card">
+                    <h3>AlexNet LRN Hyperparameters</h3>
+                    <div class="formula">
+                        $$ k = 2, \quad n = 5, \quad \alpha = 10^{-4}, \quad \beta = 0.75 $$
+                    </div>
+                </div>
+                
+                <div class="note">
+                    <strong>Purpose:</strong> LRN implements "lateral inhibition" inspired by neuroscience, where highly active neurons suppress the activity of neighboring neurons in adjacent feature maps. This encourages different feature maps to learn distinct features.
+                </div>
+                
+                <div class="example">
+                    <h4>📊 Simplified Example</h4>
+                    <p>For a neuron with activity <strong>a = 10</strong>, surrounded by neighbors with activities [8, 9, 11, 12]:</p>
+                    <div class="formula">
+                        $$ \text{Sum of squares} = 8^2 + 9^2 + 10^2 + 11^2 + 12^2 = 446 $$
+                        $$ \text{Denominator} = (2 + 0.0001 \times 446)^{0.75} = 2.03^{0.75} \approx 1.80 $$
+                        $$ b = \frac{10}{1.80} \approx 5.56 $$
+                    </div>
+                </div>
+            </div>
+            
+            <!-- DROPOUT SECTION -->
+            <div id="dropout" class="section">
+                <h2>🔷 Dropout Regularization</h2>
+                
+                <div class="math-card">
+                    <h3>Dropout During Training</h3>
+                    <div class="formula">
+                        $$ r_j^{(l)} \sim \text{Bernoulli}(p) $$
+                        $$ \tilde{y}^{(l)} = r^{(l)} \odot y^{(l)} $$
+                    </div>
+                    <p>Where:</p>
+                    <ul style="margin-left: 20px; margin-top: 10px;">
+                        <li><strong>r<sub>j</sub><sup>(l)</sup></strong>: Binary mask (0 or 1) for each neuron</li>
+                        <li><strong>p</strong>: Retention probability (AlexNet uses p = 0.5)</li>
+                        <li><strong>⊙</strong>: Element-wise multiplication</li>
+                        <li><strong>y<sup>(l)</sup></strong>: Layer activations</li>
+                    </ul>
+                </div>
+                
+                <div class="math-card">
+                    <h3>Dropout During Testing</h3>
+                    <div class="formula">
+                        $$ \tilde{y}^{(l)} = p \cdot y^{(l)} $$
+                    </div>
+                    <p>All neurons are active, but outputs are scaled by the retention probability to maintain expected values.</p>
+                </div>
+                
+                <div class="example">
+                    <h4>Why Dropout Works</h4>
+                    <p>🎯 <strong>Prevents co-adaptation:</strong> Neurons cannot rely on specific other neurons being present</p>
+                    <p>🎯 <strong>Ensemble effect:</strong> Training many "thinned" networks simultaneously</p>
+                    <p>🎯 <strong>Reduces overfitting:</strong> Forces network to learn more robust features</p>
+                </div>
+                
+                <div class="calculator">
+                    <h4>🧮 Dropout Simulation</h4>
+                    <p>Number of active neurons out of 100 with p=0.5:</p>
+                    <button onclick="simulateDropout()">Run Simulation</button>
+                    <div id="dropout_result" class="result" style="display:none;"></div>
+                </div>
+            </div>
+            
+            <!-- BACKPROPAGATION SECTION -->
+            <div id="backprop" class="section">
+                <h2>🔷 Backpropagation & Training</h2>
+                
+                <div class="math-card">
+                    <h3>Cross-Entropy Loss (Classification)</h3>
+                    <div class="formula">
+                        $$ L = -\sum_{i=1}^{C} y_i \log(\hat{y}_i) $$
+                    </div>
+                    <p>Where <strong>y<sub>i</sub></strong> is the true label (one-hot encoded) and <strong>ŷ<sub>i</sub></strong> is the predicted probability for class i.</p>
+                </div>
+                
+                <div class="math-card">
+                    <h3>Gradient Descent with Momentum</h3>
+                    <div class="formula">
+                        $$ v_t = \mu v_{t-1} - \eta \nabla_\theta L(\theta_{t-1}) $$
+                        $$ \theta_t = \theta_{t-1} + v_t $$
+                    </div>
+                    <p>Where:</p>
+                    <ul style="margin-left: 20px; margin-top: 10px;">
+                        <li><strong>μ</strong>: Momentum coefficient (0.9 in AlexNet)</li>
+                        <li><strong>η</strong>: Learning rate (0.01 initially)</li>
+                        <li><strong>v<sub>t</sub></strong>: Velocity (accumulated gradient)</li>
+                        <li><strong>θ</strong>: Model parameters</li>
+                    </ul>
+                </div>
+                
+                <div class="math-card">
+                    <h3>Weight Update with L2 Regularization</h3>
+                    <div class="formula">
+                        $$ L_{total} = L_{data} + \lambda \sum_{i} w_i^2 $$
+                        $$ \frac{\partial L_{total}}{\partial w_i} = \frac{\partial L_{data}}{\partial w_i} + 2\lambda w_i $$
+                    </div>
+                    <p>AlexNet uses weight decay <strong>λ = 0.0005</strong></p>
+                </div>
+                
+                <div class="example">
+                    <h4>📊 Training Configuration</h4>
+                    <table>
+                        <tr>
+                            <th>Parameter</th>
+                            <th>Value</th>
+                        </tr>
+                        <tr>
+                            <td>Batch Size</td>
+                            <td>128</td>
+                        </tr>
+                        <tr>
+                            <td>Initial Learning Rate</td>
+                            <td>0.01</td>
+                        </tr>
+                        <tr>
+                            <td>Momentum</td>
+                            <td>0.9</td>
+                        </tr>
+                        <tr>
+                            <td>Weight Decay</td>
+                            <td>0.0005</td>
+                        </tr>
+                        <tr>
+                            <td>Dropout (FC layers)</td>
+                            <td>0.5</td>
+                        </tr>
+                        <tr>
+                            <td>Training Time</td>
+                            <td>5-6 days (2 GPUs)</td>
+                        </tr>
+                    </table>
+                </div>
+                
+                <div class="note">
+                    <strong>Learning Rate Schedule:</strong> The learning rate is divided by 10 when the validation error rate stops improving. This happens 3 times during training.
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function showSection(sectionId) {
+            // Hide all sections
+            const sections = document.querySelectorAll('.section');
+            sections.forEach(section => section.classList.remove('active'));
+            
+            // Remove active class from all buttons
+            const buttons = document.querySelectorAll('.nav-btn');
+            buttons.forEach(btn => btn.classList.remove('active'));
+            
+            // Show selected section
+            document.getElementById(sectionId).classList.add('active');
+            
+            // Add active class to clicked button
+            event.target.classList.add('active');
+        }
+        
+        function calculateConv() {
+            const h = parseInt(document.getElementById('conv_h').value);
+            const w = parseInt(document.getElementById('conv_w').value);
+            const k = parseInt(document.getElementById('conv_k').value);
+            const s = parseInt(document.getElementById('conv_s').value);
+            const p = parseInt(document.getElementById('conv_p').value);
+            
+            const h_out = Math.floor((h + 2*p - k) / s) + 1;
+            const w_out = Math.floor((w + 2*p - k) / s) + 1;
+            
+            const result = document.getElementById('conv_result');
+            result.innerHTML = `Output Dimensions: ${h_out} × ${w_out}`;
+            result.style.display = 'block';
+        }
+        
+        function calculatePool() {
+            const h = parseInt(document.getElementById('pool_h').value);
+            const w = parseInt(document.getElementById('pool_w').value);
+            const k = parseInt(document.getElementById('pool_k').value);
+            const s = parseInt(document.getElementById('pool_s').value);
+            
+            const h_out = Math.floor((h - k) / s) + 1;
+            const w_out = Math.floor((w - k) / s) + 1;
+            
+            const result = document.getElementById('pool_result');
+            result.innerHTML = `Output Dimensions: ${h_out} × ${w_out}`;
+            result.style.display = 'block';
+        }
+        
+        function calculateReLU() {
+            const x = parseFloat(document.getElementById('relu_input').value);
+            const output = Math.max(0, x);
+            
+            const result = document.getElementById('relu_result');
+            result.innerHTML = `ReLU(${x}) = ${output}`;
+            result.style.display = 'block';
+        }
+        
+        function simulateDropout() {
+            let active = 0;
+            for (let i = 0; i < 100; i++) {
+                if (Math.random() > 0.5) active++;
+            }
+            
+            const result = document.getElementById('dropout_result');
+            result.innerHTML = `${active} out of 100 neurons remained active (Expected: ~50)`;
+            result.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
