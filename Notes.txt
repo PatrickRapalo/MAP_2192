@@ -13,3 +13,14 @@ Ask claude to explaing the problem and cost of E-Waste.
 Ask for it to give a pitch deck which can be the input of the gamma AI which can generate a presentation. This can help escalate my project quickly.
 
 https://wasteiq-smart-e-waste-de-yxjqdrd.gamma.site/
+
+
+
+Deliverables for class:
+
+1.) Slide doc for Waste IQ, 5 buisness slides, 5 tech slides
+2.) Web Site which shows the progress of my work
+3.) Colab Experiement
+4.) Scientific Poster Board
+5.) Video
+6.) Presentation
